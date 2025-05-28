@@ -1,0 +1,16 @@
+{
+  "name": "commission-calculator-app",
+  "version": "1.0.0",
+  "description": "Commission Calculator App with Firebase integration",
+  "main": "public/index.html",
+  "scripts": {
+    "start": "serve public",
+    "build": "echo 'No build step required for static site'"
+  },
+  "keywords": ["commission", "calculator", "firebase"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.0.0"
+  }
+}
