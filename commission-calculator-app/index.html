@@ -4,8 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מחשבון עמלות מבוסס תפקידים</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Rubik', sans-serif; background-color: #f7fafc; }
+        .status-message { padding: 0.75rem; margin-top: 1rem; border-radius: 0.375rem; text-align: center; font-weight: 500;}
+        .status-success { background-color: #c6f6d5; color: #2f855a; }
+        .status-error { background-color: #fed7d7; color: #c53030; }
+    </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-7xl">
@@ -83,6 +90,8 @@
     </div>
 
     <script type="module">
+        console.log('🚀 Commission Calculator starting...');
+        
         // --- GLOBAL APP VARS ---
         let currentSelectedRoleId = null;
         let rolesData = {}; // To store all loaded roles
@@ -91,6 +100,7 @@
         let profiles = {}; // User-specific profiles
 
         // --- DOM ELEMENTS ---
+        console.log('📋 Getting DOM elements...');
         const repNameInput = document.getElementById('repName');
         const periodMonthInput = document.getElementById('periodMonth');
         const periodYearInput = document.getElementById('periodYear');
@@ -120,6 +130,12 @@
         const printBtn = document.getElementById('printBtn');
         const exportCsvBtn = document.getElementById('exportCsvBtn');
         const statusMessageArea = document.getElementById('statusMessageArea');
+        
+        console.log('✅ DOM elements loaded:', {
+            repNameInput: !!repNameInput,
+            roleSelector: !!roleSelector,
+            statusMessageArea: !!statusMessageArea
+        });
 
         // --- DEFAULT ROLE STRUCTURES ---
         const DEFAULT_ROLE_STRUCTURES = {
@@ -177,9 +193,13 @@
         }
 
         function showStatusMessage(message, isSuccess = true) {
+            console.log(`📢 Status: ${message} (${isSuccess ? 'SUCCESS' : 'ERROR'})`);
             if (statusMessageArea) {
                 statusMessageArea.innerHTML = `<div class="status-message ${isSuccess ? 'status-success' : 'status-error'}">${message}</div>`;
                 setTimeout(() => { statusMessageArea.innerHTML = ''; }, 3000);
+            } else {
+                console.warn('⚠️ statusMessageArea not found, using alert fallback');
+                alert(message);
             }
         }
 
@@ -514,34 +534,54 @@
 
         // --- INITIALIZATION ---
         function initializeApp() {
-            showStatusMessage("טוען אפליקציה...", true);
+            try {
+                console.log('🔄 Initializing app...');
+                showStatusMessage("טוען אפליקציה...", true);
 
-            // Setup event listeners
-            roleSelector.addEventListener('change', handleRoleChange);
-            toggleSettingsBtn.addEventListener('click', () => {
-                const isHidden = settingsPanel.style.display === 'none';
-                settingsPanel.style.display = isHidden ? 'block' : 'none';
-                toggleSettingsBtn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות';
-            });
-            
-            saveProfileBtn.addEventListener('click', handleSaveProfile);
-            profilesDropdown.addEventListener('change', handleLoadProfile);
-            deleteProfileBtn.addEventListener('click', handleDeleteProfile);
-            resetFormBtn.addEventListener('click', handleResetForm);
-            printBtn.addEventListener('click', () => window.print());
-            exportCsvBtn.addEventListener('click', () => {
-                showStatusMessage("ייצוא CSV בפיתוח", true);
-            });
-            
-            // Set initial values
-            repNameInput.value = 'נציג לדוגמה';
-            const now = new Date();
-            periodMonthInput.value = now.getMonth() + 1;
-            periodYearInput.value = now.getFullYear();
+                // Check if critical elements exist
+                if (!roleSelector || !repNameInput || !totalBonusAmount) {
+                    throw new Error('Critical DOM elements missing');
+                }
 
-            // Load data and start
-            loadAllRoles();
-            showStatusMessage("אפליקציה נטענה בהצלחה!", true);
+                // Setup event listeners
+                console.log('🎯 Setting up event listeners...');
+                roleSelector.addEventListener('change', handleRoleChange);
+                
+                if (toggleSettingsBtn) {
+                    toggleSettingsBtn.addEventListener('click', () => {
+                        const isHidden = settingsPanel.style.display === 'none';
+                        settingsPanel.style.display = isHidden ? 'block' : 'none';
+                        toggleSettingsBtn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות';
+                    });
+                }
+                
+                if (saveProfileBtn) saveProfileBtn.addEventListener('click', handleSaveProfile);
+                if (profilesDropdown) profilesDropdown.addEventListener('change', handleLoadProfile);
+                if (deleteProfileBtn) deleteProfileBtn.addEventListener('click', handleDeleteProfile);
+                if (resetFormBtn) resetFormBtn.addEventListener('click', handleResetForm);
+                if (printBtn) printBtn.addEventListener('click', () => window.print());
+                if (exportCsvBtn) {
+                    exportCsvBtn.addEventListener('click', () => {
+                        showStatusMessage("ייצוא CSV בפיתוח", true);
+                    });
+                }
+                
+                // Set initial values
+                console.log('📝 Setting initial values...');
+                if (repNameInput) repNameInput.value = 'נציג לדוגמה';
+                const now = new Date();
+                if (periodMonthInput) periodMonthInput.value = now.getMonth() + 1;
+                if (periodYearInput) periodYearInput.value = now.getFullYear();
+
+                // Load data and start
+                console.log('📊 Loading roles...');
+                loadAllRoles();
+                showStatusMessage("אפליקציה נטענה בהצלחה!", true);
+                
+            } catch (error) {
+                console.error('❌ Error initializing app:', error);
+                showStatusMessage(`שגיאה באתחול: ${error.message}`, false);
+            }
         }
 
         document.addEventListener('DOMContentLoaded', initializeApp);
