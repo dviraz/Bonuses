@@ -82,6 +82,112 @@
         </div>
     </div>
 
-    <script src="script.js" type="module"></script>
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp as fbInitializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"; // Aliased import
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, getDocs, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAafirKnsTVHXkrTHTdnQhuOh55Nuyngss",
+            authDomain: "bonuses-d9b8f.firebaseapp.com",
+            projectId: "bonuses-d9b8f",
+            storageBucket: "bonuses-d9b8f.firebasestorage.app",
+            messagingSenderId: "875104313918",
+            appId: "1:875104313918:web:400616782fb7b8c9dd676f"
+        };
+
+        // --- GLOBAL FIREBASE & APP VARS ---
+        let db, auth, userId, appId;
+        let currentSelectedRoleId = null;
+        let rolesData = {}; // To store all loaded roles { roleId: {name, categoryDefinitions, bonusSettings} }
+        let currentCategoryDefinitions = [];
+        let currentBonusSettings = {};
+        let profiles = {}; // User-specific profiles { profileId: { profileName, roleId, goals } }
+
+        // --- DOM ELEMENTS ---
+        const repNameInput = document.getElementById('repName');
+        const periodMonthInput = document.getElementById('periodMonth');
+        const periodYearInput = document.getElementById('periodYear');
+        const resultRepName = document.getElementById('resultRepName');
+        const resultPeriod = document.getElementById('resultPeriod');
+        const resultRoleName = document.getElementById('resultRoleName');
+        const totalBonusAmount = document.getElementById('totalBonusAmount');
+        const totalPerformanceBonus = document.getElementById('totalPerformanceBonus');
+        const performanceBonusList = document.getElementById('performanceBonusList');
+        const totalTargetBonus = document.getElementById('totalTargetBonus');
+        const targetBonusList = document.getElementById('targetBonusList');
+        
+        const roleSelector = document.getElementById('roleSelector');
+        const currentRoleForProfiles = document.getElementById('currentRoleForProfiles');
+        const dynamicCategoriesContainer = document.getElementById('dynamicCategoriesContainer');
+        
+        const settingsPanel = document.getElementById('settingsPanel');
+        const settingsRoleName = document.getElementById('settingsRoleName');
+        const settingsContainer = document.getElementById('settingsContainer');
+        const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+        const saveRoleSettingsBtn = document.getElementById('saveRoleSettingsBtn');
+
+        const profilesDropdown = document.getElementById('profilesDropdown');
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        const deleteProfileBtn = document.getElementById('deleteProfileBtn');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        const printBtn = document.getElementById('printBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const statusMessageArea = document.getElementById('statusMessageArea');
+
+        // Initialize Firebase and start the app
+        async function initializeApp() {
+            try {
+                const app = fbInitializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                appId = 'commission-calculator';
+
+                // Basic auth setup
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User authenticated:", userId);
+                        showStatusMessage("מתחבר למערכת...", true);
+                        // Add your app initialization logic here
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                });
+
+                // Basic UI setup
+                setupEventListeners();
+                showStatusMessage("אפליקציה נטענה בהצלחה!", true);
+                
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                showStatusMessage("שגיאה בהתחברות לשרת", false);
+            }
+        }
+
+        function setupEventListeners() {
+            // Add basic event listeners
+            if (resetFormBtn) {
+                resetFormBtn.addEventListener('click', () => {
+                    showStatusMessage("הטופס אופס", true);
+                });
+            }
+            if (printBtn) {
+                printBtn.addEventListener('click', () => window.print());
+            }
+        }
+
+        function showStatusMessage(message, isSuccess = true) {
+            if (statusMessageArea) {
+                statusMessageArea.innerHTML = `<div class="status-message ${isSuccess ? 'status-success' : 'status-error'}">${message}</div>`;
+                setTimeout(() => { statusMessageArea.innerHTML = ''; }, 3000);
+            }
+        }
+
+        // Start the application
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
 </body>
 </html>
