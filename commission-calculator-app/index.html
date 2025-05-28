@@ -83,28 +83,12 @@
     </div>
 
     <script type="module">
-        // Firebase SDK imports
-        import { initializeApp as fbInitializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"; // Aliased import
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, getDocs, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyAafirKnsTVHXkrTHTdnQhuOh55Nuyngss",
-            authDomain: "bonuses-d9b8f.firebaseapp.com",
-            projectId: "bonuses-d9b8f",
-            storageBucket: "bonuses-d9b8f.firebasestorage.app",
-            messagingSenderId: "875104313918",
-            appId: "1:875104313918:web:400616782fb7b8c9dd676f"
-        };
-
-        // --- GLOBAL FIREBASE & APP VARS ---
-        let db, auth, userId, appId;
+        // --- GLOBAL APP VARS ---
         let currentSelectedRoleId = null;
-        let rolesData = {}; // To store all loaded roles { roleId: {name, categoryDefinitions, bonusSettings} }
+        let rolesData = {}; // To store all loaded roles
         let currentCategoryDefinitions = [];
         let currentBonusSettings = {};
-        let profiles = {}; // User-specific profiles { profileId: { profileName, roleId, goals } }
+        let profiles = {}; // User-specific profiles
 
         // --- DOM ELEMENTS ---
         const repNameInput = document.getElementById('repName');
@@ -137,46 +121,59 @@
         const exportCsvBtn = document.getElementById('exportCsvBtn');
         const statusMessageArea = document.getElementById('statusMessageArea');
 
-        // Initialize Firebase and start the app
-        async function initializeApp() {
-            try {
-                const app = fbInitializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                appId = 'commission-calculator';
-
-                // Basic auth setup
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log("User authenticated:", userId);
-                        showStatusMessage("מתחבר למערכת...", true);
-                        // Add your app initialization logic here
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                });
-
-                // Basic UI setup
-                setupEventListeners();
-                showStatusMessage("אפליקציה נטענה בהצלחה!", true);
-                
-            } catch (error) {
-                console.error("Firebase initialization error:", error);
-                showStatusMessage("שגיאה בהתחברות לשרת", false);
+        // --- DEFAULT ROLE STRUCTURES ---
+        const DEFAULT_ROLE_STRUCTURES = {
+            "default_reps": {
+                name: "נציגים",
+                categoryDefinitions: [
+                    { id: 'personalRenewals', name: 'חידושים אישיים', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
+                    { id: 'teamRenewals', name: 'חידושים צוותיים', type: 'threshold_only', goalInput: true, actualInput: true },
+                    { id: 'newSales', name: 'מכירות חדשות', type: 'performance_tiered_amount', goalInput: true, actualInput: true },
+                    { id: 'ridersSales', name: 'מכירות ריידרים', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
+                ],
+                bonusSettings: {
+                    personalRenewals: { tiers: [{ threshold: 0.86, value: 20 }, { threshold: 0.81, value: 15 }, { threshold: 0.75, value: 10 }], targetThreshold: 0.95, targetBonus: 250 },
+                    teamRenewals: { targetThreshold: 0.88, targetBonus: 250 },
+                    newSales: { tiers: [{ threshold: 81, value: 70 }, { threshold: 61, value: 50 }, { threshold: 31, value: 40 }, { threshold: 1, value: 20 }], targetThreshold: 1.25, targetBonus: 250 },
+                    ridersSales: { multiplier: 20 }
+                }
+            },
+            "senior_reps": {
+                name: "נציג בכיר",
+                categoryDefinitions: [
+                    { id: 'personalRenewalsSr', name: 'יעד אישי (בכיר)', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
+                    { id: 'teamRenewalsSr', name: 'יעד צוותי (בכיר)', type: 'threshold_only', goalInput: true, actualInput: true },
+                    { id: 'newSalesSr', name: 'מכירות חדשות (בכיר)', type: 'performance_tiered_amount', goalInput: true, actualInput: true },
+                    { id: 'ridersSalesSr', name: 'מכירות ריידרים (בכיר)', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
+                ],
+                bonusSettings: {
+                    personalRenewalsSr: { tiers: [{ threshold: 0.90, value: 25 }, { threshold: 0.85, value: 20 }, { threshold: 0.80, value: 15 }], targetThreshold: 0.97, targetBonus: 300 },
+                    teamRenewalsSr: { targetThreshold: 0.90, targetBonus: 300 },
+                    newSalesSr: { tiers: [{ threshold: 81, value: 80 }, { threshold: 61, value: 60 }, { threshold: 31, value: 50 }, { threshold: 1, value: 25 }], targetThreshold: 1.30, targetBonus: 300 },
+                    ridersSalesSr: { multiplier: 25 }
+                }
+            },
+            "control_service": {
+                name: "שירות בקרה",
+                categoryDefinitions: [
+                    { id: 'personalGoalCs', name: 'יעד אישי (בקרה)', type: 'threshold_percentage_bonus', goalInput: true, actualInput: true },
+                    { id: 'teamGoalCs', name: 'יעד צוותי (בקרה)', type: 'threshold_percentage_bonus', goalInput: true, actualInput: true },
+                    { id: 'excellenceCs', name: 'בונוס הצטיינות', type: 'fixed_bonus_on_condition', goalInput: false, actualInput: true }
+                ],
+                bonusSettings: {
+                    personalGoalCs: { tiers: [{ percentage_threshold: 1.0, bonus: 500 }, { percentage_threshold: 0.9, bonus: 250 }], targetBonus: 0 },
+                    teamGoalCs: { tiers: [{ percentage_threshold: 1.0, bonus: 400 }, { percentage_threshold: 0.9, bonus: 200 }], targetBonus: 0 },
+                    excellenceCs: { conditionValue: 1, bonusAmount: 300 }
+                }
             }
-        }
-
-        function setupEventListeners() {
-            // Add basic event listeners
-            if (resetFormBtn) {
-                resetFormBtn.addEventListener('click', () => {
-                    showStatusMessage("הטופס אופס", true);
-                });
-            }
-            if (printBtn) {
-                printBtn.addEventListener('click', () => window.print());
-            }
+        };
+        
+        // --- UTILITY FUNCTIONS ---
+        const formatCurrency = (amount) => `₪${amount.toLocaleString('he-IL')}`;
+        const formatPercentage = (value) => `${(value * 100).toFixed(1)}%`;
+        const getInputValue = (id) => {
+            const el = document.getElementById(id);
+            return el ? (parseFloat(el.value) || 0) : 0;
         }
 
         function showStatusMessage(message, isSuccess = true) {
@@ -186,7 +183,367 @@
             }
         }
 
-        // Start the application
+        // --- LOCAL STORAGE FUNCTIONS ---
+        function saveToLocalStorage(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+                return true;
+            } catch (error) {
+                console.error('Error saving to localStorage:', error);
+                return false;
+            }
+        }
+
+        function loadFromLocalStorage(key, defaultValue = null) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultValue;
+            } catch (error) {
+                console.error('Error loading from localStorage:', error);
+                return defaultValue;
+            }
+        }
+
+        // --- DATA MANAGEMENT ---
+        function loadAllRoles() {
+            showStatusMessage("טוען תפקידים...", true);
+            
+            // Load from localStorage or use defaults
+            const savedRoles = loadFromLocalStorage('commissionRoles', DEFAULT_ROLE_STRUCTURES);
+            rolesData = savedRoles;
+            
+            // Populate role selector
+            roleSelector.innerHTML = '<option value="">בחר תפקיד...</option>';
+            Object.keys(rolesData).forEach(roleId => {
+                const option = document.createElement('option');
+                option.value = roleId;
+                option.textContent = rolesData[roleId].name;
+                roleSelector.appendChild(option);
+            });
+
+            showStatusMessage("תפקידים נטענו בהצלחה!", true);
+            
+            // Auto-select first role
+            if (roleSelector.options.length > 1) {
+                const lastSelectedRoleId = localStorage.getItem('lastSelectedRoleId');
+                if (lastSelectedRoleId && rolesData[lastSelectedRoleId]) {
+                    roleSelector.value = lastSelectedRoleId;
+                } else {
+                    roleSelector.value = roleSelector.options[1].value;
+                }
+                handleRoleChange();
+            }
+        }
+
+        function handleRoleChange() {
+            const selectedId = roleSelector.value;
+            if (!selectedId || !rolesData[selectedId]) {
+                currentSelectedRoleId = null;
+                currentCategoryDefinitions = [];
+                currentBonusSettings = {};
+                dynamicCategoriesContainer.innerHTML = '<p class="text-gray-500">אנא בחר תפקיד להצגת קטגוריות.</p>';
+                settingsContainer.innerHTML = '<p class="text-gray-500">אנא בחר תפקיד לעריכת הגדרות.</p>';
+                settingsRoleName.textContent = "";
+                currentRoleForProfiles.textContent = "אנא בחר תפקיד";
+                return;
+            }
+
+            currentSelectedRoleId = selectedId;
+            localStorage.setItem('lastSelectedRoleId', currentSelectedRoleId);
+
+            const role = rolesData[currentSelectedRoleId];
+            currentCategoryDefinitions = role.categoryDefinitions || [];
+            currentBonusSettings = JSON.parse(JSON.stringify(role.bonusSettings || {}));
+
+            settingsRoleName.textContent = role.name;
+            currentRoleForProfiles.textContent = role.name;
+            resultRoleName.textContent = role.name;
+
+            buildFormCategories(currentCategoryDefinitions);
+            buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
+            attachDataInputListeners();
+            loadUserProfiles();
+            calculateBonuses();
+        }
+
+        function buildFormCategories(categories) {
+            let html = '';
+            if (!categories || categories.length === 0) {
+                html = '<p class="text-gray-500">לתפקיד זה אין קטגוריות מוגדרות.</p>';
+            } else {
+                categories.forEach(cat => {
+                    html += `
+                        <div class="input-group border-t pt-4 mt-4">
+                            <h3 class="text-lg font-semibold text-gray-600 mb-2">${cat.name}</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                ${cat.goalInput ? `<div><label for="${cat.id}Goal" class="input-label">יעד:</label><input type="number" id="${cat.id}Goal" class="input-field data-input" value="0"></div>` : '<div></div>'}
+                                ${cat.actualInput ? `<div><label for="${cat.id}Actual" class="input-label">ביצוע בפועל:</label><input type="number" id="${cat.id}Actual" class="input-field data-input" value="0"></div>` : '<div></div>'}
+                            </div>
+                        </div>`;
+                });
+            }
+            dynamicCategoriesContainer.innerHTML = html;
+        }
+
+        function buildSettingsForm(categories, currentSettings) {
+            let html = '';
+            if (!categories || categories.length === 0) {
+                html = '<p class="text-gray-500">אין הגדרות זמינות לתפקיד זה.</p>';
+                settingsContainer.innerHTML = html;
+                return;
+            }
+
+            categories.forEach(cat => {
+                const catSettings = currentSettings[cat.id] || {};
+                html += `<div class="settings-category-block">
+                            <h4 class="text-md font-semibold text-gray-700 mb-3">${cat.name}</h4>`;
+
+                if (cat.type === 'performance_tiered_percentage' || cat.type === 'performance_tiered_amount') {
+                    html += `<label class="input-label">מדרגות בונוס:</label>`;
+                    (catSettings.tiers || []).forEach((tier, i) => {
+                        html += `<div class="grid grid-cols-2 gap-2 mb-1">
+                                    <input type="number" step="0.01" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="tier-threshold" data-tier-index="${i}" value="${tier.threshold}">
+                                    <input type="number" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="tier-value" data-tier-index="${i}" value="${tier.value}">
+                                 </div>`;
+                    });
+
+                    if (catSettings.hasOwnProperty('targetThreshold')) {
+                         html += `<label class="input-label mt-2">סף בונוס יעד:</label>
+                                  <input type="number" step="0.01" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="targetThreshold" value="${catSettings.targetThreshold}">`;
+                    }
+                }
+
+                html += `</div>`;
+            });
+            settingsContainer.innerHTML = html;
+        }
+
+        // --- CALCULATION LOGIC ---
+        function calculateBonuses() {
+            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
+                totalBonusAmount.textContent = formatCurrency(0);
+                performanceBonusList.innerHTML = '';
+                targetBonusList.innerHTML = '';
+                return;
+            }
+
+            const repName = repNameInput.value || "אלמוני";
+            const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
+            const year = parseInt(periodYearInput.value) || new Date().getFullYear();
+
+            let performanceBonusTotal = 0;
+            let targetBonusTotal = 0;
+            performanceBonusList.innerHTML = '';
+            targetBonusList.innerHTML = '';
+
+            currentCategoryDefinitions.forEach(cat => {
+                const goal = cat.goalInput ? getInputValue(`${cat.id}Goal`) : 0;
+                const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
+                const percentageOfGoal = goal > 0 ? actual / goal : 0;
+                
+                const catSettings = currentBonusSettings[cat.id] || {};
+                let performanceBonus = 0;
+                let targetBonus = 0;
+                let perfBonusDesc = '';
+
+                switch (cat.type) {
+                    case 'performance_tiered_percentage':
+                        const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
+                        const renewalMultiplier = renewalTier ? renewalTier.value : 0;
+                        performanceBonus = actual * renewalMultiplier;
+                        perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, מכפיל ${renewalMultiplier})`;
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_tiered_amount':
+                        const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
+                        const salesMultiplier = salesTier ? salesTier.value : 0;
+                        performanceBonus = actual * salesMultiplier;
+                        perfBonusDesc = `(${actual} מכירות, מכפיל ${salesMultiplier})`;
+                         if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_fixed_multiplier':
+                        const fixedMultiplier = catSettings.multiplier || 0;
+                        performanceBonus = actual * fixedMultiplier;
+                        perfBonusDesc = `(${actual} מכירות, מכפיל ${fixedMultiplier})`;
+                        break;
+                    case 'threshold_only':
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד)`;
+                        break;
+                }
+
+                if (performanceBonus > 0) {
+                    performanceBonusTotal += performanceBonus;
+                    performanceBonusList.innerHTML += `<li><span class="label">${cat.name} ${perfBonusDesc}:</span> <span class="value">${formatCurrency(performanceBonus)}</span></li>`;
+                }
+
+                if (targetBonus > 0) {
+                    targetBonusTotal += targetBonus;
+                    targetBonusList.innerHTML += `<li><span class="check-mark">✓</span><span class="label">${cat.name}:</span> <span class="value">${formatCurrency(targetBonus)}</span></li>`;
+                }
+            });
+
+            resultRepName.textContent = repName;
+            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+            resultPeriod.textContent = `${monthNames[month - 1] || ''} ${year}`;
+            totalPerformanceBonus.textContent = formatCurrency(performanceBonusTotal);
+            totalTargetBonus.textContent = formatCurrency(targetBonusTotal);
+            totalBonusAmount.textContent = formatCurrency(performanceBonusTotal + targetBonusTotal);
+        }
+
+        // --- PROFILES FUNCTIONS ---
+        function loadUserProfiles() {
+            const savedProfiles = loadFromLocalStorage('commissionProfiles', {});
+            profiles = savedProfiles;
+            
+            profilesDropdown.innerHTML = '<option value="">טען פרופיל...</option>';
+            Object.keys(profiles).forEach(profileId => {
+                const profile = profiles[profileId];
+                if (profile.roleId === currentSelectedRoleId) {
+                    const option = document.createElement('option');
+                    option.value = profileId;
+                    option.textContent = profile.profileName;
+                    profilesDropdown.appendChild(option);
+                }
+            });
+        }
+
+        function handleSaveProfile() {
+            if (!currentSelectedRoleId) {
+                showStatusMessage("יש לבחור תפקיד תחילה.", false);
+                return;
+            }
+            const name = repNameInput.value;
+            if (!name) { 
+                showStatusMessage('יש להזין שם נציג לשמירת פרופיל.', false); 
+                return; 
+            }
+
+            const profileData = {
+                profileName: name,
+                roleId: currentSelectedRoleId,
+                goals: {}
+            };
+            
+            currentCategoryDefinitions.forEach(cat => {
+                if (cat.goalInput) {
+                    profileData.goals[`${cat.id}Goal`] = getInputValue(`${cat.id}Goal`);
+                }
+            });
+            
+            profiles[name.replace(/\s+/g, '_')] = profileData;
+            saveToLocalStorage('commissionProfiles', profiles);
+            showStatusMessage(`פרופיל "${name}" נשמר בהצלחה!`, true);
+            loadUserProfiles();
+        }
+
+        function handleLoadProfile() {
+            const profileId = profilesDropdown.value;
+            if (!profileId || !profiles[profileId]) return;
+            const profile = profiles[profileId];
+
+            if (profile.roleId !== currentSelectedRoleId) {
+                roleSelector.value = profile.roleId;
+                handleRoleChange();
+            }
+            
+            repNameInput.value = profile.profileName;
+            currentCategoryDefinitions.forEach(cat => {
+                if (cat.goalInput) {
+                    const goalInputEl = document.getElementById(`${cat.id}Goal`);
+                    if (goalInputEl) goalInputEl.value = profile.goals[`${cat.id}Goal`] || 0;
+                }
+                if (cat.actualInput) {
+                    const actualInputEl = document.getElementById(`${cat.id}Actual`);
+                    if (actualInputEl) actualInputEl.value = '';
+                }
+            });
+            calculateBonuses();
+        }
+
+        function handleDeleteProfile() {
+            const profileId = profilesDropdown.value;
+            if (!profileId) { 
+                showStatusMessage('יש לבחור פרופיל למחיקה.', false); 
+                return; 
+            }
+
+            const confirmed = window.prompt(`לאישור מחיקת פרופיל "${profiles[profileId].profileName}", הקלד "מחק":`);
+            if (confirmed === "מחק") {
+                delete profiles[profileId];
+                saveToLocalStorage('commissionProfiles', profiles);
+                showStatusMessage(`פרופיל נמחק.`, true);
+                loadUserProfiles();
+            } else {
+                showStatusMessage("מחיקה בוטלה.", true);
+            }
+        }
+
+        // --- EVENT HANDLERS ---
+        function handleResetForm() {
+            const confirmed = window.prompt(`לאישור איפוס הטופס, הקלד "אפס":`);
+            if (confirmed !== "אפס") {
+                showStatusMessage("איפוס בוטל.", true);
+                return;
+            }
+            repNameInput.value = 'נציג חדש';
+            const now = new Date();
+            periodMonthInput.value = now.getMonth() + 1;
+            periodYearInput.value = now.getFullYear();
+            currentCategoryDefinitions.forEach(cat => {
+                 if (cat.goalInput) document.getElementById(`${cat.id}Goal`).value = '';
+                 if (cat.actualInput) document.getElementById(`${cat.id}Actual`).value = '';
+            });
+            profilesDropdown.value = "";
+            calculateBonuses();
+            showStatusMessage("הטופס אופס.", true);
+        }
+
+        function attachDataInputListeners() {
+            document.querySelectorAll('.data-input, #repName, #periodMonth, #periodYear').forEach(el => {
+                el.removeEventListener('input', calculateBonuses);
+                el.addEventListener('input', calculateBonuses);
+            });
+        }
+
+        // --- INITIALIZATION ---
+        function initializeApp() {
+            showStatusMessage("טוען אפליקציה...", true);
+
+            // Setup event listeners
+            roleSelector.addEventListener('change', handleRoleChange);
+            toggleSettingsBtn.addEventListener('click', () => {
+                const isHidden = settingsPanel.style.display === 'none';
+                settingsPanel.style.display = isHidden ? 'block' : 'none';
+                toggleSettingsBtn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות';
+            });
+            
+            saveProfileBtn.addEventListener('click', handleSaveProfile);
+            profilesDropdown.addEventListener('change', handleLoadProfile);
+            deleteProfileBtn.addEventListener('click', handleDeleteProfile);
+            resetFormBtn.addEventListener('click', handleResetForm);
+            printBtn.addEventListener('click', () => window.print());
+            exportCsvBtn.addEventListener('click', () => {
+                showStatusMessage("ייצוא CSV בפיתוח", true);
+            });
+            
+            // Set initial values
+            repNameInput.value = 'נציג לדוגמה';
+            const now = new Date();
+            periodMonthInput.value = now.getMonth() + 1;
+            periodYearInput.value = now.getFullYear();
+
+            // Load data and start
+            loadAllRoles();
+            showStatusMessage("אפליקציה נטענה בהצלחה!", true);
+        }
+
         document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
