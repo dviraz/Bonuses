@@ -1,10 +1,9 @@
 {
   "name": "commission-calculator-app",
   "version": "1.0.0",
-  "description": "Commission Calculator App with Firebase integration",
-  "main": "public/index.html",
+  "description": "Commission Calculator App with Firebase integration",  "main": "index.html",
   "scripts": {
-    "start": "serve public",
+    "start": "serve .",
     "build": "echo 'No build step required for static site'"
   },
   "keywords": ["commission", "calculator", "firebase"],
