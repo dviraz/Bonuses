@@ -379,6 +379,23 @@
                         }
                         perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד)`;
                         break;
+                    case 'threshold_percentage_bonus':
+                        const csPercentageTier = (catSettings.tiers || []).sort((a,b) => b.percentage_threshold - a.percentage_threshold).find(t => percentageOfGoal >= t.percentage_threshold);
+                        if (csPercentageTier) {
+                            performanceBonus = csPercentageTier.bonus;
+                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, בונוס ${csPercentageTier.bonus})`;
+                        } else {
+                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד)`;
+                        }
+                        break;
+                    case 'fixed_bonus_on_condition':
+                        if (actual >= (catSettings.conditionValue || 1)) {
+                            performanceBonus = catSettings.bonusAmount || 0;
+                            perfBonusDesc = `(תנאי מתקיים, בונוס ${catSettings.bonusAmount})`;
+                        } else {
+                            perfBonusDesc = `(תנאי לא מתקיים)`;
+                        }
+                        break;
                 }
 
                 if (performanceBonus > 0) {
@@ -488,6 +505,115 @@
             }
         }
 
+        // --- CSV EXPORT FUNCTION ---
+        function handleExportCsv() {
+            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
+                showStatusMessage("אין נתונים לייצוא. אנא בחר תפקיד והזן נתונים.", false);
+                return;
+            }
+
+            const repName = repNameInput.value || "אלמוני";
+            const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
+            const year = parseInt(periodYearInput.value) || new Date().getFullYear();
+            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+            const period = `${monthNames[month - 1] || ''} ${year}`;
+            const role = rolesData[currentSelectedRoleId];
+
+            // Create CSV data
+            let csvContent = "\uFEFF"; // BOM for UTF-8 with Hebrew support
+            
+            // Header information
+            csvContent += `דוח בונוס עמלות\n`;
+            csvContent += `שם הנציג,${repName}\n`;
+            csvContent += `תפקיד,${role.name}\n`;
+            csvContent += `תקופה,${period}\n`;
+            csvContent += `תאריך יצירת הדוח,${new Date().toLocaleDateString('he-IL')}\n\n`;
+
+            // Categories data
+            csvContent += `קטגוריה,יעד,ביצוע בפועל,אחוז השגת יעד,בונוס ביצועים,בונוס יעדים\n`;
+            
+            let totalPerformanceBonus = 0;
+            let totalTargetBonus = 0;
+
+            currentCategoryDefinitions.forEach(cat => {
+                const goal = cat.goalInput ? getInputValue(`${cat.id}Goal`) : 0;
+                const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
+                const percentageOfGoal = goal > 0 ? actual / goal : 0;
+                const catSettings = currentBonusSettings[cat.id] || {};
+                
+                let performanceBonus = 0;
+                let targetBonus = 0;
+
+                // Calculate bonuses (same logic as in calculateBonuses function)
+                switch (cat.type) {
+                    case 'performance_tiered_percentage':
+                        const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
+                        const renewalMultiplier = renewalTier ? renewalTier.value : 0;
+                        performanceBonus = actual * renewalMultiplier;
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_tiered_amount':
+                        const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
+                        const salesMultiplier = salesTier ? salesTier.value : 0;
+                        performanceBonus = actual * salesMultiplier;
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_fixed_multiplier':
+                        const fixedMultiplier = catSettings.multiplier || 0;
+                        performanceBonus = actual * fixedMultiplier;
+                        break;
+                    case 'threshold_only':
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'threshold_percentage_bonus':
+                        const csPercentageTier = (catSettings.tiers || []).sort((a,b) => b.percentage_threshold - a.percentage_threshold).find(t => percentageOfGoal >= t.percentage_threshold);
+                        if (csPercentageTier) {
+                            performanceBonus = csPercentageTier.bonus;
+                        }
+                        break;
+                    case 'fixed_bonus_on_condition':
+                        if (actual >= (catSettings.conditionValue || 1)) {
+                            performanceBonus = catSettings.bonusAmount || 0;
+                        }
+                        break;
+                }
+
+                totalPerformanceBonus += performanceBonus;
+                totalTargetBonus += targetBonus;
+
+                csvContent += `${cat.name},${goal},${actual},${(percentageOfGoal * 100).toFixed(1)}%,₪${performanceBonus.toLocaleString('he-IL')},₪${targetBonus.toLocaleString('he-IL')}\n`;
+            });
+
+            // Summary
+            csvContent += `\nסיכום\n`;
+            csvContent += `סה"כ בונוס ביצועים,₪${totalPerformanceBonus.toLocaleString('he-IL')}\n`;
+            csvContent += `סה"כ בונוס יעדים,₪${totalTargetBonus.toLocaleString('he-IL')}\n`;
+            csvContent += `סה"כ בונוס כולל,₪${(totalPerformanceBonus + totalTargetBonus).toLocaleString('he-IL')}\n`;
+
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showStatusMessage(`קובץ CSV יוצא בהצלחה עבור ${repName}!`, true);
+            } else {
+                showStatusMessage("הדפדפן אינו תומך בהורדת קבצים.", false);
+            }
+        }
+
         // --- EVENT HANDLERS ---
         function handleResetForm() {
             const confirmed = window.prompt(`לאישור איפוס הטופס, הקלד "אפס":`);
@@ -532,9 +658,7 @@
             deleteProfileBtn.addEventListener('click', handleDeleteProfile);
             resetFormBtn.addEventListener('click', handleResetForm);
             printBtn.addEventListener('click', () => window.print());
-            exportCsvBtn.addEventListener('click', () => {
-                showStatusMessage("ייצוא CSV בפיתוח", true);
-            });
+            exportCsvBtn.addEventListener('click', handleExportCsv);
             
             // Set initial values
             repNameInput.value = 'נציג לדוגמה';
