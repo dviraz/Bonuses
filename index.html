@@ -87,7 +87,7 @@
         </div>
     </div>
 
-    <script type="module">
+    <script>
         // --- GLOBAL APP VARS ---
         let currentSelectedRoleId = null;
         let rolesData = {}; // To store all loaded roles
@@ -128,6 +128,23 @@
 
         // --- DEFAULT ROLE STRUCTURES ---
         const DEFAULT_ROLE_STRUCTURES = {
+            "test_simple": {
+                name: "מבחן פשוט",
+                categoryDefinitions: [
+                    { id: 'testCategory', name: 'קטגוריית מבחן', type: 'performance_tiered_percentage', goalInput: true, actualInput: true }
+                ],
+                bonusSettings: {
+                    testCategory: { 
+                        tiers: [
+                            { threshold: 0.86, value: 20 }, 
+                            { threshold: 0.81, value: 15 }, 
+                            { threshold: 0.75, value: 10 }
+                        ], 
+                        targetThreshold: 0.95, 
+                        targetBonus: 250 
+                    }
+                }
+            },
             "default_reps": {
                 name: "נציגים",
                 categoryDefinitions: [
@@ -175,13 +192,18 @@
         
         // --- UTILITY FUNCTIONS ---
         const formatCurrency = (amount) => {
+            if (typeof amount !== 'number' || isNaN(amount)) {
+                amount = 0;
+            }
             const formatted = amount.toLocaleString('he-IL');
             return `₪${formatted}`;
         };
         const formatPercentage = (value) => `${(value * 100).toFixed(1)}%`;
         const getInputValue = (id) => {
             const el = document.getElementById(id);
-            return el ? (parseFloat(el.value) || 0) : 0;
+            if (!el) return 0;
+            const value = parseFloat(el.value);
+            return isNaN(value) ? 0 : value;
         }
 
         function showStatusMessage(message, isSuccess = true) {
@@ -245,6 +267,7 @@
 
         function handleRoleChange() {
             const selectedId = roleSelector.value;
+            
             if (!selectedId || !rolesData[selectedId]) {
                 currentSelectedRoleId = null;
                 currentCategoryDefinitions = [];
@@ -260,6 +283,7 @@
             localStorage.setItem('lastSelectedRoleId', currentSelectedRoleId);
 
             const role = rolesData[currentSelectedRoleId];
+            
             currentCategoryDefinitions = role.categoryDefinitions || [];
             currentBonusSettings = JSON.parse(JSON.stringify(role.bonusSettings || {}));
 
@@ -330,6 +354,8 @@
         function calculateBonuses() {
             if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
                 totalBonusAmount.textContent = formatCurrency(0);
+                totalPerformanceBonus.textContent = formatCurrency(0);
+                totalTargetBonus.textContent = formatCurrency(0);
                 performanceBonusList.innerHTML = '';
                 targetBonusList.innerHTML = '';
                 return;
@@ -349,6 +375,8 @@
                 const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
                 const percentageOfGoal = goal > 0 ? actual / goal : 0;
                 
+
+                
                 const catSettings = currentBonusSettings[cat.id] || {};
                 let performanceBonus = 0;
                 let targetBonus = 0;
@@ -357,19 +385,27 @@
                 switch (cat.type) {
                     case 'performance_tiered_percentage':
                         const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
-                        const renewalMultiplier = renewalTier ? renewalTier.value : 0;
-                        performanceBonus = actual * renewalMultiplier;
-                        perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, מכפיל ${renewalMultiplier})`;
+                        if (renewalTier) {
+                            const renewalMultiplier = renewalTier.value;
+                            performanceBonus = actual * renewalMultiplier;
+                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, מכפיל ${renewalMultiplier})`;
+                        } else {
+                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, אין מכפיל)`;
+                        }
                         if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
                             targetBonus = catSettings.targetBonus || 0;
                         }
                         break;
                     case 'performance_tiered_amount':
                         const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
-                        const salesMultiplier = salesTier ? salesTier.value : 0;
-                        performanceBonus = actual * salesMultiplier;
-                        perfBonusDesc = `(${actual} מכירות, מכפיל ${salesMultiplier})`;
-                         if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                        if (salesTier) {
+                            const salesMultiplier = salesTier.value;
+                            performanceBonus = actual * salesMultiplier;
+                            perfBonusDesc = `(${actual} מכירות, מכפיל ${salesMultiplier})`;
+                        } else {
+                            perfBonusDesc = `(${actual} מכירות, אין מכפיל)`;
+                        }
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
                             targetBonus = catSettings.targetBonus || 0;
                         }
                         break;
@@ -414,12 +450,32 @@
                 }
             });
 
-            resultRepName.textContent = repName;
+
+
+            // Update display elements
+            if (resultRepName) {
+                resultRepName.textContent = repName;
+            }
+            
             const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
-            resultPeriod.textContent = `${monthNames[month - 1] || ''} ${year}`;
-            totalPerformanceBonus.textContent = formatCurrency(performanceBonusTotal);
-            totalTargetBonus.textContent = formatCurrency(targetBonusTotal);
-            totalBonusAmount.textContent = formatCurrency(performanceBonusTotal + targetBonusTotal);
+            const periodText = `${monthNames[month - 1] || ''} ${year}`;
+            
+            if (resultPeriod) {
+                resultPeriod.textContent = periodText;
+            }
+            
+            if (totalPerformanceBonus) {
+                totalPerformanceBonus.textContent = formatCurrency(performanceBonusTotal);
+            }
+            
+            if (totalTargetBonus) {
+                totalTargetBonus.textContent = formatCurrency(targetBonusTotal);
+            }
+            
+            if (totalBonusAmount) {
+                const totalAmount = performanceBonusTotal + targetBonusTotal;
+                totalBonusAmount.textContent = formatCurrency(totalAmount);
+            }
         }
 
         // --- PROFILES FUNCTIONS ---
@@ -679,6 +735,10 @@
 
         // --- INITIALIZATION ---
         function initializeApp() {
+            // Clear localStorage to ensure clean defaults (for debugging)
+            // Uncomment the next line if you want to reset settings
+            // localStorage.clear();
+            
             showStatusMessage("טוען אפליקציה...", true);
 
             // Setup event listeners
@@ -706,7 +766,6 @@
             loadAllRoles();
             showStatusMessage("אפליקציה נטענה בהצלחה!", true);
         }
-
         document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
