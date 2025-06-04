@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="p-4 md:p-8">
     <div class="container mx-auto max-w-7xl">
@@ -80,6 +81,7 @@
                 <div class="flex space-x-reverse space-x-2 mt-4">
                     <button id="printBtn" class="btn btn-primary">הדפס</button>
                     <button id="exportCsvBtn" class="btn btn-secondary">ייצא ל-CSV</button>
+                    <button id="exportPdfBtn" class="btn btn-secondary">שמור ב-PDF</button>
                 </div>
             </div>
         </div>
@@ -122,6 +124,7 @@
         const resetFormBtn = document.getElementById('resetFormBtn');
         const printBtn = document.getElementById('printBtn');
         const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
         const statusMessageArea = document.getElementById('statusMessageArea');
 
         // --- DEFAULT ROLE STRUCTURES ---
@@ -505,6 +508,239 @@
             }
         }
 
+        // --- PDF EXPORT FUNCTION ---
+        function handleExportPdf() {
+            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
+                showStatusMessage("אין נתונים לייצוא. אנא בחר תפקיד והזן נתונים.", false);
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const repName = repNameInput.value || "אלמוני";
+            const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
+            const year = parseInt(periodYearInput.value) || new Date().getFullYear();
+            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+            const period = `${monthNames[month - 1] || ''} ${year}`;
+            const role = rolesData[currentSelectedRoleId];
+
+            // Configure font for Hebrew support
+            doc.setFont("helvetica");
+            
+            let yPosition = 20;
+            const pageWidth = doc.internal.pageSize.width;
+            const rightMargin = 20;
+            const leftMargin = 20;
+
+            // Title
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            const title = "דוח בונוס עמלות";
+            const titleWidth = doc.getTextWidth(title);
+            doc.text(title, pageWidth - rightMargin - titleWidth, yPosition);
+            yPosition += 15;
+
+            // Header Information
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            
+            const headerInfo = [
+                `שם הנציג: ${repName}`,
+                `תפקיד: ${role.name}`,
+                `תקופה: ${period}`,
+                `תאריך יצירה: ${new Date().toLocaleDateString('he-IL')}`
+            ];
+
+            headerInfo.forEach(info => {
+                const textWidth = doc.getTextWidth(info);
+                doc.text(info, pageWidth - rightMargin - textWidth, yPosition);
+                yPosition += 7;
+            });
+
+            yPosition += 10;
+
+            // Calculate bonuses
+            let totalPerformanceBonus = 0;
+            let totalTargetBonus = 0;
+            const bonusData = [];
+
+            currentCategoryDefinitions.forEach(cat => {
+                const goal = cat.goalInput ? getInputValue(`${cat.id}Goal`) : 0;
+                const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
+                const percentageOfGoal = goal > 0 ? actual / goal : 0;
+                const catSettings = currentBonusSettings[cat.id] || {};
+                
+                let performanceBonus = 0;
+                let targetBonus = 0;
+
+                // Calculate bonuses (same logic as in calculateBonuses function)
+                switch (cat.type) {
+                    case 'performance_tiered_percentage':
+                        const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
+                        const renewalMultiplier = renewalTier ? renewalTier.value : 0;
+                        performanceBonus = actual * renewalMultiplier;
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_tiered_amount':
+                        const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
+                        const salesMultiplier = salesTier ? salesTier.value : 0;
+                        performanceBonus = actual * salesMultiplier;
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'performance_fixed_multiplier':
+                        const fixedMultiplier = catSettings.multiplier || 0;
+                        performanceBonus = actual * fixedMultiplier;
+                        break;
+                    case 'threshold_only':
+                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
+                            targetBonus = catSettings.targetBonus || 0;
+                        }
+                        break;
+                    case 'threshold_percentage_bonus':
+                        const csPercentageTier = (catSettings.tiers || []).sort((a,b) => b.percentage_threshold - a.percentage_threshold).find(t => percentageOfGoal >= t.percentage_threshold);
+                        if (csPercentageTier) {
+                            performanceBonus = csPercentageTier.bonus;
+                        }
+                        break;
+                    case 'fixed_bonus_on_condition':
+                        if (actual >= (catSettings.conditionValue || 1)) {
+                            performanceBonus = catSettings.bonusAmount || 0;
+                        }
+                        break;
+                }
+
+                totalPerformanceBonus += performanceBonus;
+                totalTargetBonus += targetBonus;
+
+                bonusData.push({
+                    name: cat.name,
+                    goal,
+                    actual,
+                    percentage: percentageOfGoal,
+                    performanceBonus,
+                    targetBonus
+                });
+            });
+
+            // Table header
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            const tableHeaderText = "פירוט בונוסים לפי קטגוריות";
+            const tableHeaderWidth = doc.getTextWidth(tableHeaderText);
+            doc.text(tableHeaderText, pageWidth - rightMargin - tableHeaderWidth, yPosition);
+            yPosition += 10;
+
+            // Table
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+
+            // Table headers
+            const colWidths = [35, 25, 25, 30, 35, 35];
+            const headers = ["קטגוריה", "יעד", "ביצוע", "אחוז השגה", "בונוס ביצועים", "בונוס יעדים"];
+            
+            let xPosition = pageWidth - rightMargin;
+            headers.forEach((header, index) => {
+                xPosition -= colWidths[index];
+                doc.setFont("helvetica", "bold");
+                doc.text(header, xPosition + 2, yPosition);
+            });
+            yPosition += 8;
+
+            // Draw table line
+            doc.line(leftMargin, yPosition - 2, pageWidth - rightMargin, yPosition - 2);
+
+            // Table data
+            doc.setFont("helvetica", "normal");
+            bonusData.forEach(row => {
+                if (yPosition > 270) { // Check if we need a new page
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                xPosition = pageWidth - rightMargin;
+                
+                // Category name
+                xPosition -= colWidths[0];
+                doc.text(row.name, xPosition + 2, yPosition);
+                
+                // Goal
+                xPosition -= colWidths[1];
+                doc.text(row.goal.toString(), xPosition + 2, yPosition);
+                
+                // Actual
+                xPosition -= colWidths[2];
+                doc.text(row.actual.toString(), xPosition + 2, yPosition);
+                
+                // Percentage
+                xPosition -= colWidths[3];
+                doc.text(`${(row.percentage * 100).toFixed(1)}%`, xPosition + 2, yPosition);
+                
+                // Performance Bonus
+                xPosition -= colWidths[4];
+                doc.text(`₪${row.performanceBonus.toLocaleString('he-IL')}`, xPosition + 2, yPosition);
+                
+                // Target Bonus
+                xPosition -= colWidths[5];
+                doc.text(`₪${row.targetBonus.toLocaleString('he-IL')}`, xPosition + 2, yPosition);
+                
+                yPosition += 7;
+            });
+
+            yPosition += 10;
+            
+            // Draw table line
+            doc.line(leftMargin, yPosition - 5, pageWidth - rightMargin, yPosition - 5);
+
+            // Summary section
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            
+            // Total Performance Bonus
+            const perfBonusText = `סה"כ בונוס ביצועים: ₪${totalPerformanceBonus.toLocaleString('he-IL')}`;
+            const perfBonusWidth = doc.getTextWidth(perfBonusText);
+            doc.text(perfBonusText, pageWidth - rightMargin - perfBonusWidth, yPosition);
+            yPosition += 10;
+
+            // Total Target Bonus
+            const targetBonusText = `סה"כ בונוס יעדים: ₪${totalTargetBonus.toLocaleString('he-IL')}`;
+            const targetBonusWidth = doc.getTextWidth(targetBonusText);
+            doc.text(targetBonusText, pageWidth - rightMargin - targetBonusWidth, yPosition);
+            yPosition += 15;
+
+            // Grand Total
+            doc.setFontSize(16);
+            const grandTotal = totalPerformanceBonus + totalTargetBonus;
+            const grandTotalText = `סה"כ בונוס כולל: ₪${grandTotal.toLocaleString('he-IL')}`;
+            const grandTotalWidth = doc.getTextWidth(grandTotalText);
+            
+            // Add a box around the grand total
+            const boxPadding = 5;
+            const boxX = pageWidth - rightMargin - grandTotalWidth - boxPadding * 2;
+            const boxY = yPosition - 8;
+            const boxWidth = grandTotalWidth + boxPadding * 2;
+            const boxHeight = 12;
+            
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            
+            doc.text(grandTotalText, pageWidth - rightMargin - grandTotalWidth - boxPadding, yPosition);
+
+            // Save the PDF
+            const fileName = `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
+            doc.save(fileName);
+            showStatusMessage(`קובץ PDF נשמר בהצלחה עבור ${repName}!`, true);
+        }
+
         // --- CSV EXPORT FUNCTION ---
         function handleExportCsv() {
             if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
@@ -659,6 +895,7 @@
             resetFormBtn.addEventListener('click', handleResetForm);
             printBtn.addEventListener('click', () => window.print());
             exportCsvBtn.addEventListener('click', handleExportCsv);
+            exportPdfBtn.addEventListener('click', handleExportPdf);
             
             // Set initial values
             repNameInput.value = 'נציג לדוגמה';
