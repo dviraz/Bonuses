@@ -591,102 +591,152 @@
                 });
             });
 
-            // Use the visible results section for PDF generation
-            const resultsSection = document.getElementById('resultsReport');
-            if (!resultsSection) {
-                showStatusMessage("שגיאה: לא ניתן למצוא את קטע התוצאות", false);
-                return;
-            }
-
-            // Temporarily modify the results section for better PDF appearance
-            const originalStyle = resultsSection.style.cssText;
-            resultsSection.style.cssText = `
-                ${originalStyle}
-                background: white !important;
-                padding: 30px !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                width: 794px !important;
-                max-width: none !important;
-                font-family: 'Rubik', Arial, sans-serif !important;
-                direction: rtl !important;
-                color: #333 !important;
-            `;
-
-            // Add header information temporarily
-            const headerDiv = document.createElement('div');
-            headerDiv.style.cssText = `
-                text-align: center;
-                margin-bottom: 30px;
-                border-bottom: 2px solid #e2e8f0;
-                padding-bottom: 20px;
-            `;
-            headerDiv.innerHTML = `
-                <h1 style="font-size: 28px; font-weight: bold; margin: 0; color: #2c5282; margin-bottom: 20px;">דוח בונוס עמלות</h1>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 16px; text-align: right;">
-                    <div><strong>שם הנציג:</strong> ${repName}</div>
-                    <div><strong>תפקיד:</strong> ${role.name}</div>
-                    <div><strong>תקופה:</strong> ${period}</div>
-                    <div><strong>תאריך יצירה:</strong> ${new Date().toLocaleDateString('he-IL')}</div>
-                </div>
-            `;
-            resultsSection.insertBefore(headerDiv, resultsSection.firstChild);
-
-            // Generate PDF using html2canvas
-            html2canvas(resultsSection, {
-                scale: 2.5,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                width: 794,
-                height: resultsSection.scrollHeight,
-                scrollX: 0,
-                scrollY: 0,
-                foreignObjectRendering: true,
-                imageTimeout: 15000,
-                removeContainer: true
-            }).then(canvas => {
-                // Restore original styling
-                resultsSection.style.cssText = originalStyle;
-                resultsSection.removeChild(headerDiv);
-
-                const { jsPDF } = window.jspdf;
-                const imgData = canvas.toDataURL('image/png', 1.0);
-                
-                // Calculate PDF dimensions
-                const imgWidth = 210; // A4 width in mm
-                const pageHeight = 297; // A4 height in mm
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                let heightLeft = imgHeight;
-
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                let position = 0;
-
-                // Add first page
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-
-                // Add additional pages if needed
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-
-                const fileName = `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
-                pdf.save(fileName);
-                showStatusMessage(`קובץ PDF נשמר בהצלחה עבור ${repName}!`, true);
-            }).catch(error => {
-                // Restore original styling in case of error
-                resultsSection.style.cssText = originalStyle;
-                if (resultsSection.contains(headerDiv)) {
-                    resultsSection.removeChild(headerDiv);
-                }
-                console.error('Error generating PDF:', error);
-                showStatusMessage("שגיאה ביצירת קובץ PDF. אנא נסה שוב.", false);
+            // Create PDF using jsPDF with direct text positioning for Hebrew
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
             });
+
+            // Configure font for Hebrew support
+            doc.setFont("helvetica");
+            
+            let yPosition = 20;
+            const pageWidth = doc.internal.pageSize.width;
+            const rightMargin = 20;
+            const leftMargin = 20;
+
+            // Title
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            const title = "Commission Bonus Report - " + repName;
+            doc.text(title, leftMargin, yPosition);
+            yPosition += 15;
+
+            // Header Information - use English labels for better compatibility
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            
+            const headerInfo = [
+                `Representative: ${repName}`,
+                `Role: ${role.name}`,
+                `Period: ${period}`,
+                `Created: ${new Date().toLocaleDateString('en-US')}`
+            ];
+
+            headerInfo.forEach(info => {
+                doc.text(info, leftMargin, yPosition);
+                yPosition += 7;
+            });
+
+            yPosition += 10;
+
+            // Table header
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text("Bonus Details by Category", leftMargin, yPosition);
+            yPosition += 10;
+
+            // Table headers in English for better compatibility
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            
+            const headers = ["Category", "Target", "Actual", "Achievement %", "Performance Bonus", "Target Bonus"];
+            const colWidths = [40, 25, 25, 25, 35, 35];
+            let xPosition = leftMargin;
+            
+            headers.forEach((header, index) => {
+                doc.text(header, xPosition, yPosition);
+                xPosition += colWidths[index];
+            });
+            yPosition += 8;
+
+            // Draw table line
+            doc.line(leftMargin, yPosition - 2, pageWidth - rightMargin, yPosition - 2);
+
+            // Table data
+            doc.setFont("helvetica", "normal");
+            bonusData.forEach(row => {
+                if (yPosition > 270) { // Check if we need a new page
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                xPosition = leftMargin;
+                
+                // Category name - use transliteration for Hebrew names
+                const categoryName = row.name.includes('חידושים') ? 'Renewals' :
+                                  row.name.includes('מכירות חדשות') ? 'New Sales' :
+                                  row.name.includes('ריידרים') ? 'Riders' :
+                                  row.name.includes('בקרה') ? 'Control' :
+                                  row.name.includes('הצטיינות') ? 'Excellence' : row.name;
+                
+                doc.text(categoryName, xPosition, yPosition);
+                xPosition += colWidths[0];
+                
+                // Goal
+                doc.text(row.goal.toLocaleString('en-US'), xPosition, yPosition);
+                xPosition += colWidths[1];
+                
+                // Actual
+                doc.text(row.actual.toLocaleString('en-US'), xPosition, yPosition);
+                xPosition += colWidths[2];
+                
+                // Percentage
+                doc.text(`${(row.percentage * 100).toFixed(1)}%`, xPosition, yPosition);
+                xPosition += colWidths[3];
+                
+                // Performance Bonus
+                doc.text(`${row.performanceBonus.toLocaleString('en-US')} ILS`, xPosition, yPosition);
+                xPosition += colWidths[4];
+                
+                // Target Bonus
+                doc.text(`${row.targetBonus.toLocaleString('en-US')} ILS`, xPosition, yPosition);
+                
+                yPosition += 7;
+            });
+
+            yPosition += 10;
+            
+            // Draw table line
+            doc.line(leftMargin, yPosition - 5, pageWidth - rightMargin, yPosition - 5);
+
+            // Summary section
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            
+            // Total Performance Bonus
+            doc.text(`Total Performance Bonus: ${totalPerformanceBonus.toLocaleString('en-US')} ILS`, leftMargin, yPosition);
+            yPosition += 10;
+
+            // Total Target Bonus
+            doc.text(`Total Target Bonus: ${totalTargetBonus.toLocaleString('en-US')} ILS`, leftMargin, yPosition);
+            yPosition += 15;
+
+            // Grand Total
+            doc.setFontSize(16);
+            const grandTotal = totalPerformanceBonus + totalTargetBonus;
+            
+            // Add a box around the grand total
+            const grandTotalText = `TOTAL BONUS: ${grandTotal.toLocaleString('en-US')} ILS`;
+            const textWidth = doc.getTextWidth(grandTotalText);
+            const boxPadding = 5;
+            const boxX = leftMargin - 2;
+            const boxY = yPosition - 8;
+            const boxWidth = textWidth + boxPadding * 2;
+            const boxHeight = 12;
+            
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(boxX, boxY, boxWidth, boxHeight);
+            
+            doc.text(grandTotalText, leftMargin, yPosition);
+
+            // Save the PDF
+            const fileName = `Bonus_Report_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
+            doc.save(fileName);
+            showStatusMessage(`PDF file saved successfully for ${repName}!`, true);
         }
 
         // --- CSV EXPORT FUNCTION ---
