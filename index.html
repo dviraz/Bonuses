@@ -521,9 +521,15 @@
             const repName = repNameInput.value || "אלמוני";
             const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
             const year = parseInt(periodYearInput.value) || new Date().getFullYear();
-            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             const period = `${monthNames[month - 1] || ''} ${year}`;
             const role = rolesData[currentSelectedRoleId];
+
+            // Create safe text versions for PDF
+            const safeRepName = repName.replace(/[^\x00-\x7F]/g, "Rep");
+            const safeRoleName = role.name.includes('נציגים') ? 'Sales Representatives' :
+                               role.name.includes('בכיר') ? 'Senior Representatives' :
+                               role.name.includes('בקרה') ? 'Control Service' : 'Staff';
 
             // Calculate all bonus data
             let totalPerformanceBonus = 0;
@@ -610,17 +616,17 @@
             // Title
             doc.setFontSize(18);
             doc.setFont("helvetica", "bold");
-            const title = "Commission Bonus Report - " + repName;
+            const title = "COMMISSION BONUS REPORT";
             doc.text(title, leftMargin, yPosition);
             yPosition += 15;
 
-            // Header Information - use English labels for better compatibility
+            // Header Information - use clean English
             doc.setFontSize(12);
             doc.setFont("helvetica", "normal");
             
             const headerInfo = [
-                `Representative: ${repName}`,
-                `Role: ${role.name}`,
+                `Representative: ${safeRepName}`,
+                `Role: ${safeRoleName}`,
                 `Period: ${period}`,
                 `Created: ${new Date().toLocaleDateString('en-US')}`
             ];
@@ -665,12 +671,30 @@
 
                 xPosition = leftMargin;
                 
-                // Category name - use transliteration for Hebrew names
-                const categoryName = row.name.includes('חידושים') ? 'Renewals' :
-                                  row.name.includes('מכירות חדשות') ? 'New Sales' :
-                                  row.name.includes('ריידרים') ? 'Riders' :
-                                  row.name.includes('בקרה') ? 'Control' :
-                                  row.name.includes('הצטיינות') ? 'Excellence' : row.name;
+                // Category name - proper mapping for all Hebrew categories
+                let categoryName = 'Unknown';
+                if (row.name.includes('חידושים אישיים') || row.name.includes('personalRenewals')) {
+                    categoryName = 'Personal Renewals';
+                } else if (row.name.includes('חידושים צוותיים') || row.name.includes('teamRenewals')) {
+                    categoryName = 'Team Renewals';
+                } else if (row.name.includes('מכירות חדשות') || row.name.includes('newSales')) {
+                    categoryName = 'New Sales';
+                } else if (row.name.includes('ריידרים') || row.name.includes('riders')) {
+                    categoryName = 'Riders Sales';
+                } else if (row.name.includes('יעד אישי') && row.name.includes('בכיר')) {
+                    categoryName = 'Senior Personal Goal';
+                } else if (row.name.includes('יעד צוותי') && row.name.includes('בכיר')) {
+                    categoryName = 'Senior Team Goal';
+                } else if (row.name.includes('יעד אישי') && row.name.includes('בקרה')) {
+                    categoryName = 'Control Personal Goal';
+                } else if (row.name.includes('יעד צוותי') && row.name.includes('בקרה')) {
+                    categoryName = 'Control Team Goal';
+                } else if (row.name.includes('הצטיינות')) {
+                    categoryName = 'Excellence Bonus';
+                } else {
+                    // Fallback - remove Hebrew characters
+                    categoryName = row.name.replace(/[^\x00-\x7F]/g, "").trim() || 'Category';
+                }
                 
                 doc.text(categoryName, xPosition, yPosition);
                 xPosition += colWidths[0];
@@ -734,7 +758,7 @@
             doc.text(grandTotalText, leftMargin, yPosition);
 
             // Save the PDF
-            const fileName = `Bonus_Report_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
+            const fileName = `Bonus_Report_${safeRepName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
             doc.save(fileName);
             showStatusMessage(`PDF file saved successfully for ${repName}!`, true);
         }
