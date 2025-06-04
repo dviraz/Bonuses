@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="p-4 md:p-8">
@@ -515,12 +516,7 @@
                 return;
             }
 
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
+            showStatusMessage("יוצר קובץ PDF...", true);
 
             const repName = repNameInput.value || "אלמוני";
             const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
@@ -529,42 +525,7 @@
             const period = `${monthNames[month - 1] || ''} ${year}`;
             const role = rolesData[currentSelectedRoleId];
 
-            // Configure font for Hebrew support
-            doc.setFont("helvetica");
-            
-            let yPosition = 20;
-            const pageWidth = doc.internal.pageSize.width;
-            const rightMargin = 20;
-            const leftMargin = 20;
-
-            // Title
-            doc.setFontSize(18);
-            doc.setFont("helvetica", "bold");
-            const title = "דוח בונוס עמלות";
-            const titleWidth = doc.getTextWidth(title);
-            doc.text(title, pageWidth - rightMargin - titleWidth, yPosition);
-            yPosition += 15;
-
-            // Header Information
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "normal");
-            
-            const headerInfo = [
-                `שם הנציג: ${repName}`,
-                `תפקיד: ${role.name}`,
-                `תקופה: ${period}`,
-                `תאריך יצירה: ${new Date().toLocaleDateString('he-IL')}`
-            ];
-
-            headerInfo.forEach(info => {
-                const textWidth = doc.getTextWidth(info);
-                doc.text(info, pageWidth - rightMargin - textWidth, yPosition);
-                yPosition += 7;
-            });
-
-            yPosition += 10;
-
-            // Calculate bonuses
+            // Calculate all bonus data
             let totalPerformanceBonus = 0;
             let totalTargetBonus = 0;
             const bonusData = [];
@@ -578,7 +539,6 @@
                 let performanceBonus = 0;
                 let targetBonus = 0;
 
-                // Calculate bonuses (same logic as in calculateBonuses function)
                 switch (cat.type) {
                     case 'performance_tiered_percentage':
                         const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
@@ -631,114 +591,110 @@
                 });
             });
 
-            // Table header
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "bold");
-            const tableHeaderText = "פירוט בונוסים לפי קטגוריות";
-            const tableHeaderWidth = doc.getTextWidth(tableHeaderText);
-            doc.text(tableHeaderText, pageWidth - rightMargin - tableHeaderWidth, yPosition);
-            yPosition += 10;
+            // Create a temporary div for PDF content with proper Hebrew styling
+            const pdfContent = document.createElement('div');
+            pdfContent.style.cssText = `
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+                width: 794px;
+                padding: 40px;
+                background: white;
+                font-family: 'Rubik', Arial, sans-serif;
+                direction: rtl;
+                text-align: right;
+                font-size: 14px;
+                line-height: 1.5;
+                color: #333;
+            `;
 
-            // Table
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
+            pdfContent.innerHTML = `
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #2c5282;">דוח בונוס עמלות</h1>
+                </div>
+                
+                <div style="margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 16px;">
+                        <div><strong>שם הנציג:</strong> ${repName}</div>
+                        <div><strong>תפקיד:</strong> ${role.name}</div>
+                        <div><strong>תקופה:</strong> ${period}</div>
+                        <div><strong>תאריך יצירה:</strong> ${new Date().toLocaleDateString('he-IL')}</div>
+                    </div>
+                </div>
 
-            // Table headers
-            const colWidths = [35, 25, 25, 30, 35, 35];
-            const headers = ["קטגוריה", "יעד", "ביצוע", "אחוז השגה", "בונוס ביצועים", "בונוס יעדים"];
-            
-            let xPosition = pageWidth - rightMargin;
-            headers.forEach((header, index) => {
-                xPosition -= colWidths[index];
-                doc.setFont("helvetica", "bold");
-                doc.text(header, xPosition + 2, yPosition);
+                <div style="margin-bottom: 20px;">
+                    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #2d3748; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">פירוט בונוסים לפי קטגוריות</h2>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #4a5568; color: white;">
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">קטגוריה</th>
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">יעד</th>
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">ביצוע</th>
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">אחוז השגה</th>
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">בונוס ביצועים</th>
+                            <th style="padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold;">בונוס יעדים</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${bonusData.map((row, index) => `
+                            <tr style="background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${row.name}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${row.goal.toLocaleString('he-IL')}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${row.actual.toLocaleString('he-IL')}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${(row.percentage * 100).toFixed(1)}%</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">₪${row.performanceBonus.toLocaleString('he-IL')}</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">₪${row.targetBonus.toLocaleString('he-IL')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div style="background: #e6fffa; padding: 25px; border-radius: 8px; border: 2px solid #38b2ac;">
+                    <div style="margin-bottom: 15px; font-size: 16px;">
+                        <strong>סה"כ בונוס ביצועים:</strong> <span style="color: #2c5282;">₪${totalPerformanceBonus.toLocaleString('he-IL')}</span>
+                    </div>
+                    <div style="margin-bottom: 15px; font-size: 16px;">
+                        <strong>סה"כ בונוס יעדים:</strong> <span style="color: #2c5282;">₪${totalTargetBonus.toLocaleString('he-IL')}</span>
+                    </div>
+                    <div style="font-size: 20px; font-weight: bold; text-align: center; margin-top: 20px; padding: 15px; background: #2c5282; color: white; border-radius: 8px;">
+                        סה"כ בונוס כולל: ₪${(totalPerformanceBonus + totalTargetBonus).toLocaleString('he-IL')}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(pdfContent);
+
+            // Use html2canvas to convert the content to image, then to PDF
+            html2canvas(pdfContent, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                width: 794,
+                height: pdfContent.scrollHeight
+            }).then(canvas => {
+                document.body.removeChild(pdfContent);
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [794, canvas.height + 80]
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, 794, canvas.height);
+
+                const fileName = `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
+                pdf.save(fileName);
+                showStatusMessage(`קובץ PDF נשמר בהצלחה עבור ${repName}!`, true);
+            }).catch(error => {
+                document.body.removeChild(pdfContent);
+                console.error('Error generating PDF:', error);
+                showStatusMessage("שגיאה ביצירת קובץ PDF. אנא נסה שוב.", false);
             });
-            yPosition += 8;
-
-            // Draw table line
-            doc.line(leftMargin, yPosition - 2, pageWidth - rightMargin, yPosition - 2);
-
-            // Table data
-            doc.setFont("helvetica", "normal");
-            bonusData.forEach(row => {
-                if (yPosition > 270) { // Check if we need a new page
-                    doc.addPage();
-                    yPosition = 20;
-                }
-
-                xPosition = pageWidth - rightMargin;
-                
-                // Category name
-                xPosition -= colWidths[0];
-                doc.text(row.name, xPosition + 2, yPosition);
-                
-                // Goal
-                xPosition -= colWidths[1];
-                doc.text(row.goal.toString(), xPosition + 2, yPosition);
-                
-                // Actual
-                xPosition -= colWidths[2];
-                doc.text(row.actual.toString(), xPosition + 2, yPosition);
-                
-                // Percentage
-                xPosition -= colWidths[3];
-                doc.text(`${(row.percentage * 100).toFixed(1)}%`, xPosition + 2, yPosition);
-                
-                // Performance Bonus
-                xPosition -= colWidths[4];
-                doc.text(`₪${row.performanceBonus.toLocaleString('he-IL')}`, xPosition + 2, yPosition);
-                
-                // Target Bonus
-                xPosition -= colWidths[5];
-                doc.text(`₪${row.targetBonus.toLocaleString('he-IL')}`, xPosition + 2, yPosition);
-                
-                yPosition += 7;
-            });
-
-            yPosition += 10;
-            
-            // Draw table line
-            doc.line(leftMargin, yPosition - 5, pageWidth - rightMargin, yPosition - 5);
-
-            // Summary section
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "bold");
-            
-            // Total Performance Bonus
-            const perfBonusText = `סה"כ בונוס ביצועים: ₪${totalPerformanceBonus.toLocaleString('he-IL')}`;
-            const perfBonusWidth = doc.getTextWidth(perfBonusText);
-            doc.text(perfBonusText, pageWidth - rightMargin - perfBonusWidth, yPosition);
-            yPosition += 10;
-
-            // Total Target Bonus
-            const targetBonusText = `סה"כ בונוס יעדים: ₪${totalTargetBonus.toLocaleString('he-IL')}`;
-            const targetBonusWidth = doc.getTextWidth(targetBonusText);
-            doc.text(targetBonusText, pageWidth - rightMargin - targetBonusWidth, yPosition);
-            yPosition += 15;
-
-            // Grand Total
-            doc.setFontSize(16);
-            const grandTotal = totalPerformanceBonus + totalTargetBonus;
-            const grandTotalText = `סה"כ בונוס כולל: ₪${grandTotal.toLocaleString('he-IL')}`;
-            const grandTotalWidth = doc.getTextWidth(grandTotalText);
-            
-            // Add a box around the grand total
-            const boxPadding = 5;
-            const boxX = pageWidth - rightMargin - grandTotalWidth - boxPadding * 2;
-            const boxY = yPosition - 8;
-            const boxWidth = grandTotalWidth + boxPadding * 2;
-            const boxHeight = 12;
-            
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.5);
-            doc.rect(boxX, boxY, boxWidth, boxHeight);
-            
-            doc.text(grandTotalText, pageWidth - rightMargin - grandTotalWidth - boxPadding, yPosition);
-
-            // Save the PDF
-            const fileName = `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
-            doc.save(fileName);
-            showStatusMessage(`קובץ PDF נשמר בהצלחה עבור ${repName}!`, true);
         }
 
         // --- CSV EXPORT FUNCTION ---
