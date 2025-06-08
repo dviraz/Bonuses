@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; direction: rtl; }
+        .btn { padding: 10px 20px; margin: 10px; background: #007cba; color: white; border: none; cursor: pointer; }
+        .panel { background: #f0f0f0; padding: 20px; margin: 10px 0; display: none; }
+    </style>
+</head>
+<body>
+    <h1>בדיקת תפעול כפתור הגדרות</h1>
+    <button id="testToggleBtn" class="btn">הצג הגדרות תפקיד</button>
+    <div id="testPanel" class="panel">
+        <h2>זהו פאנל הגדרות לבדיקה</h2>
+        <p>אם אתה רואה זאת, הכפתור עובד!</p>
+    </div>
+
+    <script>
+        const btn = document.getElementById('testToggleBtn');
+        const panel = document.getElementById('testPanel');
+        
+        btn.addEventListener('click', () => {
+            console.log('כפתור נלחץ');
+            const isHidden = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = isHidden ? 'block' : 'none';
+            btn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות תפקיד';
+        });
+    </script>
+</body>
+</html>

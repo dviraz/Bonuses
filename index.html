@@ -55,7 +55,8 @@
 
                     <div class="flex space-x-reverse space-x-2 mt-6">
                         <button id="resetFormBtn" class="btn btn-secondary">אפס טופס</button>
-                        <button id="toggleSettingsBtn" class="btn btn-secondary">הצג הגדרות תפקיד</button>
+                        <button id="toggleSettingsBtn" class="btn btn-secondary" disabled title="בחר תפקיד תחילה">הצג הגדרות תפקיד</button>
+                        <button id="debugBtn" class="btn btn-secondary" style="background-color: #ffa500;">🔧 Debug</button>
                     </div>
                 </div>
                 
@@ -150,13 +151,13 @@
                 categoryDefinitions: [
                     { id: 'personalRenewals', name: 'חידושים אישיים', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
                     { id: 'teamRenewals', name: 'חידושים צוותיים', type: 'threshold_only', goalInput: true, actualInput: true },
-                    { id: 'newSales', name: 'מכירות חדשות', type: 'performance_tiered_amount', goalInput: true, actualInput: true },
+                    { id: 'newSales', name: 'מכירות חדשות', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
                     { id: 'ridersSales', name: 'מכירות ריידרים', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
                 ],
                 bonusSettings: {
-                    personalRenewals: { tiers: [{ threshold: 0.86, value: 20 }, { threshold: 0.81, value: 15 }, { threshold: 0.75, value: 10 }], targetThreshold: 0.95, targetBonus: 250 },
+                    personalRenewals: { tiers: [{ threshold: 0.86, value: 20 }, { threshold: 0.81, value: 15 }, { threshold: 0.75, value: 10 }, { threshold: 0.01, value: 5 }], targetThreshold: 0.95, targetBonus: 250 },
                     teamRenewals: { targetThreshold: 0.88, targetBonus: 250 },
-                    newSales: { tiers: [{ threshold: 81, value: 70 }, { threshold: 61, value: 50 }, { threshold: 31, value: 40 }, { threshold: 1, value: 20 }], targetThreshold: 1.25, targetBonus: 250 },
+                    newSales: { tiers: [{ threshold: 0.81, value: 70 }, { threshold: 0.61, value: 50 }, { threshold: 0.31, value: 40 }, { threshold: 0.01, value: 20 }], targetThreshold: 1.25, targetBonus: 250 },
                     ridersSales: { multiplier: 20 }
                 }
             },
@@ -165,13 +166,13 @@
                 categoryDefinitions: [
                     { id: 'personalRenewalsSr', name: 'יעד אישי (בכיר)', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
                     { id: 'teamRenewalsSr', name: 'יעד צוותי (בכיר)', type: 'threshold_only', goalInput: true, actualInput: true },
-                    { id: 'newSalesSr', name: 'מכירות חדשות (בכיר)', type: 'performance_tiered_amount', goalInput: true, actualInput: true },
+                    { id: 'newSalesSr', name: 'מכירות חדשות (בכיר)', type: 'performance_tiered_percentage', goalInput: true, actualInput: true },
                     { id: 'ridersSalesSr', name: 'מכירות ריידרים (בכיר)', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
                 ],
                 bonusSettings: {
-                    personalRenewalsSr: { tiers: [{ threshold: 0.90, value: 25 }, { threshold: 0.85, value: 20 }, { threshold: 0.80, value: 15 }], targetThreshold: 0.97, targetBonus: 300 },
+                    personalRenewalsSr: { tiers: [{ threshold: 0.86, value: 25 }, { threshold: 0.81, value: 20 }, { threshold: 0.75, value: 15 }, { threshold: 0.00, value: 10 }], targetThreshold: 0.97, targetBonus: 300 },
                     teamRenewalsSr: { targetThreshold: 0.90, targetBonus: 300 },
-                    newSalesSr: { tiers: [{ threshold: 81, value: 80 }, { threshold: 61, value: 60 }, { threshold: 31, value: 50 }, { threshold: 1, value: 25 }], targetThreshold: 1.30, targetBonus: 300 },
+                    newSalesSr: { tiers: [{ threshold: 0.81, value: 80 }, { threshold: 0.61, value: 60 }, { threshold: 0.31, value: 50 }, { threshold: 0.01, value: 25 }], targetThreshold: 1.30, targetBonus: 300 },
                     ridersSalesSr: { multiplier: 25 }
                 }
             },
@@ -236,32 +237,49 @@
 
         // --- DATA MANAGEMENT ---
         function loadAllRoles() {
+            console.log("🔄 Loading roles...");
             showStatusMessage("טוען תפקידים...", true);
             
-            // Load from localStorage or use defaults
-            const savedRoles = loadFromLocalStorage('commissionRoles', DEFAULT_ROLE_STRUCTURES);
-            rolesData = savedRoles;
-            
-            // Populate role selector
-            roleSelector.innerHTML = '<option value="">בחר תפקיד...</option>';
-            Object.keys(rolesData).forEach(roleId => {
-                const option = document.createElement('option');
-                option.value = roleId;
-                option.textContent = rolesData[roleId].name;
-                roleSelector.appendChild(option);
-            });
-
-            showStatusMessage("תפקידים נטענו בהצלחה!", true);
-            
-            // Auto-select first role
-            if (roleSelector.options.length > 1) {
-                const lastSelectedRoleId = localStorage.getItem('lastSelectedRoleId');
-                if (lastSelectedRoleId && rolesData[lastSelectedRoleId]) {
-                    roleSelector.value = lastSelectedRoleId;
-                } else {
-                    roleSelector.value = roleSelector.options[1].value;
+            try {
+                // Load from localStorage or use defaults
+                const savedRoles = loadFromLocalStorage('commissionRoles', DEFAULT_ROLE_STRUCTURES);
+                rolesData = savedRoles;
+                
+                console.log("📊 Loaded roles data:", rolesData);
+                console.log("📊 Number of roles:", Object.keys(rolesData).length);
+                
+                // Ensure roleSelector exists
+                if (!roleSelector) {
+                    console.error("❌ roleSelector element not found!");
+                    showStatusMessage("שגיאה: לא נמצא אלמנט בחירת תפקיד", false);
+                    return;
                 }
-                handleRoleChange();
+                
+                // Populate role selector
+                roleSelector.innerHTML = '<option value="">בחר תפקיד...</option>';
+                
+                Object.keys(rolesData).forEach(roleId => {
+                    const option = document.createElement('option');
+                    option.value = roleId;
+                    option.textContent = rolesData[roleId].name;
+                    roleSelector.appendChild(option);
+                    console.log("➕ Added role:", roleId, "-", rolesData[roleId].name);
+                });
+
+                showStatusMessage(`תפקידים נטענו בהצלחה! (${Object.keys(rolesData).length} תפקידים)`, true);
+                
+                // Auto-select first role
+                if (roleSelector.options.length > 1) {
+                    const lastSelectedRoleId = localStorage.getItem('lastSelectedRoleId');
+                    if (lastSelectedRoleId && rolesData[lastSelectedRoleId]) {
+                        roleSelector.value = lastSelectedRoleId;
+                    } else {
+                        roleSelector.value = roleSelector.options[1].value;
+                    }
+                    handleRoleChange();
+                }
+            } catch (error) {
+                showStatusMessage("שגיאה בטעינת התפקידים: " + error.message, false);
             }
         }
 
@@ -276,6 +294,12 @@
                 settingsContainer.innerHTML = '<p class="text-gray-500">אנא בחר תפקיד לעריכת הגדרות.</p>';
                 settingsRoleName.textContent = "";
                 currentRoleForProfiles.textContent = "אנא בחר תפקיד";
+                // Disable settings button when no role is selected
+                toggleSettingsBtn.disabled = true;
+                toggleSettingsBtn.title = "בחר תפקיד תחילה";
+                // Hide settings panel if it's open
+                settingsPanel.style.display = 'none';
+                toggleSettingsBtn.textContent = 'הצג הגדרות תפקיד';
                 return;
             }
 
@@ -293,7 +317,11 @@
 
             buildFormCategories(currentCategoryDefinitions);
             buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
-            attachDataInputListeners();
+            
+            // Enable settings button when a role is selected
+            toggleSettingsBtn.disabled = false;
+            toggleSettingsBtn.title = "";
+            
             loadUserProfiles();
             calculateBonuses();
         }
@@ -315,6 +343,9 @@
                 });
             }
             dynamicCategoriesContainer.innerHTML = html;
+            
+            // Attach data input listeners
+            attachDataInputListeners();
         }
 
         function buildSettingsForm(categories, currentSettings) {
@@ -331,430 +362,518 @@
                             <h4 class="text-md font-semibold text-gray-700 mb-3">${cat.name}</h4>`;
 
                 if (cat.type === 'performance_tiered_percentage' || cat.type === 'performance_tiered_amount') {
-                    html += `<label class="input-label">מדרגות בונוס:</label>`;
+                    html += `<div class="mb-4">
+                                <label class="input-label">מדרגות בונוס:</label>
+                                <div class="text-xs text-gray-500 mb-2">סף (${cat.type === 'performance_tiered_percentage' ? 'אחוז' : 'כמות'}) | מכפיל</div>
+                                <div id="tiers-${cat.id}" class="space-y-2">`;
+                    
                     (catSettings.tiers || []).forEach((tier, i) => {
-                        html += `<div class="grid grid-cols-2 gap-2 mb-1">
-                                    <input type="number" step="0.01" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="tier-threshold" data-tier-index="${i}" value="${tier.threshold}">
-                                    <input type="number" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="tier-value" data-tier-index="${i}" value="${tier.value}">
+                        html += `<div class="tier-row flex items-center gap-2">
+                                    <input type="number" step="0.01" class="input-field setting-input flex-1" 
+                                           data-setting-category="${cat.id}" data-setting-type="tier-threshold" 
+                                           data-tier-index="${i}" value="${tier.threshold}" 
+                                           placeholder="סף ${cat.type === 'performance_tiered_percentage' ? '(0.81 = 81%)' : '(מספר)'}">
+                                    <input type="number" class="input-field setting-input flex-1" 
+                                           data-setting-category="${cat.id}" data-setting-type="tier-value" 
+                                           data-tier-index="${i}" value="${tier.value}" 
+                                           placeholder="מכפיל">
+                                    <button type="button" class="btn-remove-tier text-red-500 hover:text-red-700 px-2 py-1" 
+                                            data-category="${cat.id}" data-tier-index="${i}">
+                                        ✕
+                                    </button>
                                  </div>`;
                     });
 
+                    html += `</div>
+                             <button type="button" class="btn-add-tier mt-2 text-blue-500 hover:text-blue-700 text-sm" 
+                                     data-category="${cat.id}">
+                                 + הוסף מדרגה
+                             </button>
+                           </div>`;
+
                     if (catSettings.hasOwnProperty('targetThreshold')) {
-                         html += `<label class="input-label mt-2">סף בונוס יעד:</label>
-                                  <input type="number" step="0.01" class="input-field setting-input" data-setting-category="${cat.id}" data-setting-type="targetThreshold" value="${catSettings.targetThreshold}">`;
+                         html += `<div class="mb-4">
+                                    <label class="input-label">סף בונוס יעד:</label>
+                                    <input type="number" step="0.01" class="input-field setting-input" 
+                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold" 
+                                           value="${catSettings.targetThreshold}" 
+                                           placeholder="${cat.type === 'performance_tiered_percentage' ? '0.95 = 95%' : 'כמות'}">
+                                  </div>`;
+                    }
+
+                    if (catSettings.hasOwnProperty('targetBonus')) {
+                         html += `<div class="mb-4">
+                                    <label class="input-label">סכום בונוס יעד:</label>
+                                    <input type="number" class="input-field setting-input" 
+                                           data-setting-category="${cat.id}" data-setting-type="targetBonus" 
+                                           value="${catSettings.targetBonus}" 
+                                           placeholder="סכום בש״ח">
+                                  </div>`;
+                    }
+                } else if (cat.type === 'performance_fixed_multiplier') {
+                    html += `<div class="mb-4">
+                                <label class="input-label">מכפיל קבוע:</label>
+                                <input type="number" class="input-field setting-input" 
+                                       data-setting-category="${cat.id}" data-setting-type="multiplier" 
+                                       value="${catSettings.multiplier || 0}" 
+                                       placeholder="מכפיל">
+                              </div>`;
+                } else if (cat.type === 'threshold_only') {
+                    if (catSettings.hasOwnProperty('targetThreshold')) {
+                         html += `<div class="mb-4">
+                                    <label class="input-label">סף לבונוס יעד:</label>
+                                    <input type="number" step="0.01" class="input-field setting-input" 
+                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold" 
+                                           value="${catSettings.targetThreshold}" 
+                                           placeholder="0.88 = 88%">
+                                  </div>`;
+                    }
+                    if (catSettings.hasOwnProperty('targetBonus')) {
+                         html += `<div class="mb-4">
+                                    <label class="input-label">סכום בונוס יעד:</label>
+                                    <input type="number" class="input-field setting-input" 
+                                           data-setting-category="${cat.id}" data-setting-type="targetBonus" 
+                                           value="${catSettings.targetBonus}" 
+                                           placeholder="סכום בש״ח">
+                                  </div>`;
                     }
                 }
 
                 html += `</div>`;
             });
             settingsContainer.innerHTML = html;
+            
+            // Attach event listeners for the new buttons
+            attachSettingsEventListeners();
         }
 
-        // --- CALCULATION LOGIC ---
-        function calculateBonuses() {
-            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
-                totalBonusAmount.textContent = formatCurrency(0);
-                totalPerformanceBonus.textContent = formatCurrency(0);
-                totalTargetBonus.textContent = formatCurrency(0);
-                performanceBonusList.innerHTML = '';
-                targetBonusList.innerHTML = '';
+        // --- SETTINGS EVENT LISTENERS ---
+        function attachSettingsEventListeners() {
+            // Add tier buttons
+            document.querySelectorAll('.btn-add-tier').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const categoryId = e.target.getAttribute('data-category');
+                    addNewTier(categoryId);
+                });
+            });
+
+            // Remove tier buttons
+            document.querySelectorAll('.btn-remove-tier').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const categoryId = e.target.getAttribute('data-category');
+                    const tierIndex = parseInt(e.target.getAttribute('data-tier-index'));
+                    removeTier(categoryId, tierIndex);
+                });
+            });
+
+            // Auto-save on input changes
+            document.querySelectorAll('.setting-input').forEach(input => {
+                input.addEventListener('change', saveCurrentSettings);
+                input.addEventListener('blur', saveCurrentSettings);
+            });
+        }
+
+        function addNewTier(categoryId) {
+            if (!currentBonusSettings[categoryId]) {
+                currentBonusSettings[categoryId] = { tiers: [] };
+            }
+            if (!currentBonusSettings[categoryId].tiers) {
+                currentBonusSettings[categoryId].tiers = [];
+            }
+
+            // Add new tier with default values
+            currentBonusSettings[categoryId].tiers.push({ threshold: 0.01, value: 1 });
+            
+            // Rebuild the settings form
+            buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
+            
+            showStatusMessage('מדרגה חדשה נוספה', true);
+        }
+
+        function removeTier(categoryId, tierIndex) {
+            if (!currentBonusSettings[categoryId] || !currentBonusSettings[categoryId].tiers) return;
+            
+            if (currentBonusSettings[categoryId].tiers.length <= 1) {
+                showStatusMessage('לא ניתן למחוק את המדרגה האחרונה', false);
                 return;
             }
 
-            const repName = repNameInput.value || "אלמוני";
-            const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
-            const year = parseInt(periodYearInput.value) || new Date().getFullYear();
+            currentBonusSettings[categoryId].tiers.splice(tierIndex, 1);
+            
+            // Rebuild the settings form
+            buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
+            
+            showStatusMessage('מדרגה נמחקה', true);
+        }
 
-            let performanceBonusTotal = 0;
-            let targetBonusTotal = 0;
-            performanceBonusList.innerHTML = '';
-            targetBonusList.innerHTML = '';
+        function saveCurrentSettings() {
+            // Collect all settings from form inputs
+            document.querySelectorAll('.setting-input').forEach(input => {
+                const categoryId = input.getAttribute('data-setting-category');
+                const settingType = input.getAttribute('data-setting-type');
+                const tierIndex = input.getAttribute('data-tier-index');
+                const value = parseFloat(input.value) || 0;
 
-            currentCategoryDefinitions.forEach(cat => {
-                const goal = cat.goalInput ? getInputValue(`${cat.id}Goal`) : 0;
-                const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
-                const percentageOfGoal = goal > 0 ? actual / goal : 0;
-                
-
-                
-                const catSettings = currentBonusSettings[cat.id] || {};
-                let performanceBonus = 0;
-                let targetBonus = 0;
-                let perfBonusDesc = '';
-
-                switch (cat.type) {
-                    case 'performance_tiered_percentage':
-                        const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
-                        if (renewalTier) {
-                            const renewalMultiplier = renewalTier.value;
-                            performanceBonus = actual * renewalMultiplier;
-                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, מכפיל ${renewalMultiplier})`;
-                        } else {
-                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, אין מכפיל)`;
-                        }
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        break;
-                    case 'performance_tiered_amount':
-                        const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
-                        if (salesTier) {
-                            const salesMultiplier = salesTier.value;
-                            performanceBonus = actual * salesMultiplier;
-                            perfBonusDesc = `(${actual} מכירות, מכפיל ${salesMultiplier})`;
-                        } else {
-                            perfBonusDesc = `(${actual} מכירות, אין מכפיל)`;
-                        }
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        break;
-                    case 'performance_fixed_multiplier':
-                        const fixedMultiplier = catSettings.multiplier || 0;
-                        performanceBonus = actual * fixedMultiplier;
-                        perfBonusDesc = `(${actual} מכירות, מכפיל ${fixedMultiplier})`;
-                        break;
-                    case 'threshold_only':
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד)`;
-                        break;
-                    case 'threshold_percentage_bonus':
-                        const csPercentageTier = (catSettings.tiers || []).sort((a,b) => b.percentage_threshold - a.percentage_threshold).find(t => percentageOfGoal >= t.percentage_threshold);
-                        if (csPercentageTier) {
-                            performanceBonus = csPercentageTier.bonus;
-                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד, בונוס ${csPercentageTier.bonus})`;
-                        } else {
-                            perfBonusDesc = `(${formatPercentage(percentageOfGoal)} מהיעד)`;
-                        }
-                        break;
-                    case 'fixed_bonus_on_condition':
-                        if (actual >= (catSettings.conditionValue || 1)) {
-                            performanceBonus = catSettings.bonusAmount || 0;
-                            perfBonusDesc = `(תנאי מתקיים, בונוס ${catSettings.bonusAmount})`;
-                        } else {
-                            perfBonusDesc = `(תנאי לא מתקיים)`;
-                        }
-                        break;
+                if (!currentBonusSettings[categoryId]) {
+                    currentBonusSettings[categoryId] = {};
                 }
 
-                if (performanceBonus > 0) {
-                    performanceBonusTotal += performanceBonus;
-                    performanceBonusList.innerHTML += `<li><span class="label">${cat.name} ${perfBonusDesc}:</span> <span class="value">${formatCurrency(performanceBonus)}</span></li>`;
-                }
-
-                if (targetBonus > 0) {
-                    targetBonusTotal += targetBonus;
-                    targetBonusList.innerHTML += `<li><span class="check-mark">✓</span><span class="label">${cat.name}:</span> <span class="value">${formatCurrency(targetBonus)}</span></li>`;
+                if (settingType === 'tier-threshold' || settingType === 'tier-value') {
+                    if (!currentBonusSettings[categoryId].tiers) {
+                        currentBonusSettings[categoryId].tiers = [];
+                    }
+                    if (!currentBonusSettings[categoryId].tiers[tierIndex]) {
+                        currentBonusSettings[categoryId].tiers[tierIndex] = {};
+                    }
+                    
+                    if (settingType === 'tier-threshold') {
+                        currentBonusSettings[categoryId].tiers[tierIndex].threshold = value;
+                    } else if (settingType === 'tier-value') {
+                        currentBonusSettings[categoryId].tiers[tierIndex].value = value;
+                    }
+                } else {
+                    currentBonusSettings[categoryId][settingType] = value;
                 }
             });
 
-
-
-            // Update display elements
-            if (resultRepName) {
-                resultRepName.textContent = repName;
-            }
-            
-            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
-            const periodText = `${monthNames[month - 1] || ''} ${year}`;
-            
-            if (resultPeriod) {
-                resultPeriod.textContent = periodText;
-            }
-            
-            if (totalPerformanceBonus) {
-                totalPerformanceBonus.textContent = formatCurrency(performanceBonusTotal);
-            }
-            
-            if (totalTargetBonus) {
-                totalTargetBonus.textContent = formatCurrency(targetBonusTotal);
-            }
-            
-            if (totalBonusAmount) {
-                const totalAmount = performanceBonusTotal + targetBonusTotal;
-                totalBonusAmount.textContent = formatCurrency(totalAmount);
+            // Update the role data
+            if (currentSelectedRoleId && rolesData[currentSelectedRoleId]) {
+                rolesData[currentSelectedRoleId].bonusSettings = JSON.parse(JSON.stringify(currentBonusSettings));
+                
+                // Save to localStorage
+                saveToLocalStorage('commissionRoles', rolesData);
+                
+                // Recalculate bonuses with new settings
+                calculateBonuses();
             }
         }
 
-        // --- PROFILES FUNCTIONS ---
+        function handleSaveRoleSettings() {
+            saveCurrentSettings();
+            showStatusMessage('הגדרות התפקיד נשמרו בהצלחה!', true);
+        }
+
+        function handleResetForm() {
+            // Reset all form inputs to default values
+            repNameInput.value = 'נציג לדוגמה';
+            const now = new Date();
+            periodMonthInput.value = now.getMonth() + 1;
+            periodYearInput.value = now.getFullYear();
+            
+            // Reset all category inputs
+            currentCategoryDefinitions.forEach(cat => {
+                if (cat.goalInput) {
+                    const goalInputEl = document.getElementById(`${cat.id}Goal`);
+                    if (goalInputEl) goalInputEl.value = 0;
+                }
+                if (cat.actualInput) {
+                    const actualInputEl = document.getElementById(`${cat.id}Actual`);
+                    if (actualInputEl) actualInputEl.value = 0;
+                }
+            });
+            
+            // Reset profile selection
+            profilesDropdown.value = '';
+            
+            // Recalculate with reset values
+            calculateBonuses();
+            
+            showStatusMessage('הטופס אופס!', true);
+        }
+
+        // --- BONUS CALCULATION FUNCTIONS ---
+        function calculateBonuses() {
+            if (!currentSelectedRoleId || !currentCategoryDefinitions || currentCategoryDefinitions.length === 0) {
+                totalBonusAmount.textContent = formatCurrency(0);
+                totalPerformanceBonus.textContent = formatCurrency(0);
+                totalTargetBonus.textContent = formatCurrency(0);
+                performanceBonusList.innerHTML = '<li class="text-gray-500">אנא בחר תפקיד ובזן נתונים</li>';
+                targetBonusList.innerHTML = '<li class="text-gray-500">אנא בחר תפקיד ובזן נתונים</li>';
+                return;
+            }
+
+            let totalPerformanceBonusAmount = 0;
+            let totalTargetBonusAmount = 0;
+            let performanceHTML = '';
+            let targetHTML = '';
+
+            // Update result display
+            resultRepName.textContent = repNameInput.value || 'נציג לא מוגדר';
+            resultPeriod.textContent = `${periodMonthInput.value}/${periodYearInput.value}`;
+
+            currentCategoryDefinitions.forEach(cat => {
+                const goalValue = getInputValue(`${cat.id}Goal`);
+                const actualValue = getInputValue(`${cat.id}Actual`);
+                const settings = currentBonusSettings[cat.id] || {};
+
+                let performanceBonus = 0;
+                let targetBonus = 0;
+                let performanceText = '';
+                let targetText = '';
+
+                if (cat.type === 'performance_tiered_percentage') {
+                    const percentage = goalValue > 0 ? actualValue / goalValue : 0;
+                    const tiers = settings.tiers || [];
+                    
+                    // Find applicable tier
+                    const applicableTier = tiers
+                        .sort((a, b) => b.threshold - a.threshold)
+                        .find(tier => percentage >= tier.threshold);
+                    
+                    if (applicableTier) {
+                        performanceBonus = actualValue * applicableTier.value;
+                        performanceText = `${cat.name}: ${formatCurrency(actualValue)} × ${applicableTier.value} (${formatPercentage(percentage)}) = ${formatCurrency(performanceBonus)}`;
+                    }
+
+                    // Target bonus
+                    if (settings.targetThreshold && settings.targetBonus && percentage >= settings.targetThreshold) {
+                        targetBonus = settings.targetBonus;
+                        targetText = `${cat.name}: עמידה ביעד ✓ = ${formatCurrency(targetBonus)}`;
+                    }
+                } else if (cat.type === 'performance_fixed_multiplier') {
+                    performanceBonus = actualValue * (settings.multiplier || 0);
+                    performanceText = `${cat.name}: ${formatCurrency(actualValue)} × ${settings.multiplier || 0} = ${formatCurrency(performanceBonus)}`;
+                } else if (cat.type === 'threshold_only') {
+                    const percentage = goalValue > 0 ? actualValue / goalValue : 0;
+                    if (settings.targetThreshold && settings.targetBonus && percentage >= settings.targetThreshold) {
+                        targetBonus = settings.targetBonus;
+                        targetText = `${cat.name}: עמידה ביעד ✓ = ${formatCurrency(targetBonus)}`;
+                    }
+                }
+
+                totalPerformanceBonusAmount += performanceBonus;
+                totalTargetBonusAmount += targetBonus;
+
+                if (performanceText) performanceHTML += `<li>${performanceText}</li>`;
+                if (targetText) targetHTML += `<li>${targetText}</li>`;
+            });
+
+            // Update display
+            totalPerformanceBonus.textContent = formatCurrency(totalPerformanceBonusAmount);
+            totalTargetBonus.textContent = formatCurrency(totalTargetBonusAmount);
+            totalBonusAmount.textContent = formatCurrency(totalPerformanceBonusAmount + totalTargetBonusAmount);
+            
+            performanceBonusList.innerHTML = performanceHTML || '<li class="text-gray-500">אין בונוס ביצועים</li>';
+            targetBonusList.innerHTML = targetHTML || '<li class="text-gray-500">אין בונוס יעדים</li>';
+        }
+
+        // --- PROFILE MANAGEMENT FUNCTIONS ---
         function loadUserProfiles() {
-            const savedProfiles = loadFromLocalStorage('commissionProfiles', {});
-            profiles = savedProfiles;
+            if (!currentSelectedRoleId) return;
+            
+            const roleProfiles = loadFromLocalStorage(`profiles_${currentSelectedRoleId}`, {});
+            profiles = roleProfiles;
             
             profilesDropdown.innerHTML = '<option value="">טען פרופיל...</option>';
-            Object.keys(profiles).forEach(profileId => {
-                const profile = profiles[profileId];
-                if (profile.roleId === currentSelectedRoleId) {
-                    const option = document.createElement('option');
-                    option.value = profileId;
-                    option.textContent = profile.profileName;
-                    profilesDropdown.appendChild(option);
-                }
+            Object.keys(profiles).forEach(profileName => {
+                const option = document.createElement('option');
+                option.value = profileName;
+                option.textContent = profileName;
+                profilesDropdown.appendChild(option);
             });
         }
 
         function handleSaveProfile() {
             if (!currentSelectedRoleId) {
-                showStatusMessage("יש לבחור תפקיד תחילה.", false);
+                showStatusMessage('אנא בחר תפקיד תחילה', false);
                 return;
             }
-            const name = repNameInput.value;
-            if (!name) { 
-                showStatusMessage('יש להזין שם נציג לשמירת פרופיל.', false); 
-                return; 
-            }
+
+            const profileName = prompt('הכנס שם לפרופיל:');
+            if (!profileName || profileName.trim() === '') return;
 
             const profileData = {
-                profileName: name,
-                roleId: currentSelectedRoleId,
-                goals: {}
+                repName: repNameInput.value,
+                periodMonth: periodMonthInput.value,
+                periodYear: periodYearInput.value,
+                categoryData: {}
             };
-            
+
             currentCategoryDefinitions.forEach(cat => {
-                if (cat.goalInput) {
-                    profileData.goals[`${cat.id}Goal`] = getInputValue(`${cat.id}Goal`);
-                }
+                profileData.categoryData[cat.id] = {
+                    goal: getInputValue(`${cat.id}Goal`),
+                    actual: getInputValue(`${cat.id}Actual`)
+                };
             });
-            
-            profiles[name.replace(/\s+/g, '_')] = profileData;
-            saveToLocalStorage('commissionProfiles', profiles);
-            showStatusMessage(`פרופיל "${name}" נשמר בהצלחה!`, true);
+
+            profiles[profileName.trim()] = profileData;
+            saveToLocalStorage(`profiles_${currentSelectedRoleId}`, profiles);
             loadUserProfiles();
+            showStatusMessage(`פרופיל "${profileName}" נשמר בהצלחה!`, true);
         }
 
         function handleLoadProfile() {
-            const profileId = profilesDropdown.value;
-            if (!profileId || !profiles[profileId]) return;
-            const profile = profiles[profileId];
+            const profileName = profilesDropdown.value;
+            if (!profileName || !profiles[profileName]) return;
 
-            if (profile.roleId !== currentSelectedRoleId) {
-                roleSelector.value = profile.roleId;
-                handleRoleChange();
-            }
+            const profileData = profiles[profileName];
             
-            repNameInput.value = profile.profileName;
+            repNameInput.value = profileData.repName || '';
+            periodMonthInput.value = profileData.periodMonth || '';
+            periodYearInput.value = profileData.periodYear || '';
+
             currentCategoryDefinitions.forEach(cat => {
-                if (cat.goalInput) {
-                    const goalInputEl = document.getElementById(`${cat.id}Goal`);
-                    if (goalInputEl) goalInputEl.value = profile.goals[`${cat.id}Goal`] || 0;
-                }
-                if (cat.actualInput) {
-                    const actualInputEl = document.getElementById(`${cat.id}Actual`);
-                    if (actualInputEl) actualInputEl.value = '';
+                const catData = profileData.categoryData[cat.id];
+                if (catData) {
+                    const goalInput = document.getElementById(`${cat.id}Goal`);
+                    const actualInput = document.getElementById(`${cat.id}Actual`);
+                    if (goalInput) goalInput.value = catData.goal || 0;
+                    if (actualInput) actualInput.value = catData.actual || 0;
                 }
             });
+
             calculateBonuses();
+            showStatusMessage(`פרופיל "${profileName}" נטען בהצלחה!`, true);
         }
 
         function handleDeleteProfile() {
-            const profileId = profilesDropdown.value;
-            if (!profileId) { 
-                showStatusMessage('יש לבחור פרופיל למחיקה.', false); 
-                return; 
+            const profileName = profilesDropdown.value;
+            if (!profileName || !profiles[profileName]) {
+                showStatusMessage('אנא בחר פרופיל למחיקה', false);
+                return;
             }
 
-            const confirmed = window.prompt(`לאישור מחיקת פרופיל "${profiles[profileId].profileName}", הקלד "מחק":`);
-            if (confirmed === "מחק") {
-                delete profiles[profileId];
-                saveToLocalStorage('commissionProfiles', profiles);
-                showStatusMessage(`פרופיל נמחק.`, true);
+            if (confirm(`האם אתה בטוח שברצונך למחוק את הפרופיל "${profileName}"?`)) {
+                delete profiles[profileName];
+                saveToLocalStorage(`profiles_${currentSelectedRoleId}`, profiles);
                 loadUserProfiles();
-            } else {
-                showStatusMessage("מחיקה בוטלה.", true);
+                showStatusMessage(`פרופיל "${profileName}" נמחק בהצלחה!`, true);
             }
         }
 
-        // --- PRINT/PDF FUNCTION ---
+        // --- EXPORT FUNCTIONS ---
         function handlePrint() {
-            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
-                showStatusMessage("אין נתונים להדפסה. אנא בחר תפקיד והזן נתונים.", false);
-                return;
-            }
-
-            // Show user message about PDF creation
-            showStatusMessage("מכין את הדוח להדפסה... יש לבחור 'שמור כ-PDF' בתפריט ההדפסה", true);
-
-            // Small delay to ensure calculations are complete
-            setTimeout(() => {
-                // Add print preparation
-                document.body.classList.add('printing');
-                
-                // Set document title for PDF filename
-                const repName = repNameInput.value || "נציג";
-                const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
-                const year = parseInt(periodYearInput.value) || new Date().getFullYear();
-                const originalTitle = document.title;
-                document.title = `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}`;
-
-                // Trigger print dialog
-                window.print();
-
-                // Restore original title after print
-                setTimeout(() => {
-                    document.title = originalTitle;
-                    document.body.classList.remove('printing');
-                }, 1000);
-            }, 500);
+            window.print();
         }
+
         function handleExportCsv() {
-            if (!currentSelectedRoleId || currentCategoryDefinitions.length === 0) {
-                showStatusMessage("אין נתונים לייצוא. אנא בחר תפקיד והזן נתונים.", false);
+            if (!currentSelectedRoleId) {
+                showStatusMessage('אנא בחר תפקיד תחילה', false);
                 return;
             }
 
-            const repName = repNameInput.value || "אלמוני";
-            const month = parseInt(periodMonthInput.value) || new Date().getMonth() + 1;
-            const year = parseInt(periodYearInput.value) || new Date().getFullYear();
-            const monthNames = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
-            const period = `${monthNames[month - 1] || ''} ${year}`;
-            const role = rolesData[currentSelectedRoleId];
-
-            // Create CSV data
-            let csvContent = "\uFEFF"; // BOM for UTF-8 with Hebrew support
+            const csvData = [];
+            csvData.push(['שם הנציג', 'תפקיד', 'תקופה', 'סוג בונוס', 'סכום']);
             
-            // Header information
-            csvContent += `דוח בונוס עמלות\n`;
-            csvContent += `שם הנציג,${repName}\n`;
-            csvContent += `תפקיד,${role.name}\n`;
-            csvContent += `תקופה,${period}\n`;
-            csvContent += `תאריך יצירת הדוח,${new Date().toLocaleDateString('he-IL')}\n\n`;
-
-            // Categories data
-            csvContent += `קטגוריה,יעד,ביצוע בפועל,אחוז השגת יעד,בונוס ביצועים,בונוס יעדים\n`;
+            const repName = repNameInput.value || 'נציג לא מוגדר';
+            const roleName = rolesData[currentSelectedRoleId].name;
+            const period = `${periodMonthInput.value}/${periodYearInput.value}`;
             
-            let totalPerformanceBonus = 0;
-            let totalTargetBonus = 0;
-
+            // Add performance bonuses
             currentCategoryDefinitions.forEach(cat => {
-                const goal = cat.goalInput ? getInputValue(`${cat.id}Goal`) : 0;
-                const actual = cat.actualInput ? getInputValue(`${cat.id}Actual`) : 0;
-                const percentageOfGoal = goal > 0 ? actual / goal : 0;
-                const catSettings = currentBonusSettings[cat.id] || {};
+                const goalValue = getInputValue(`${cat.id}Goal`);
+                const actualValue = getInputValue(`${cat.id}Actual`);
+                const settings = currentBonusSettings[cat.id] || {};
                 
-                let performanceBonus = 0;
-                let targetBonus = 0;
-
-                // Calculate bonuses (same logic as in calculateBonuses function)
-                switch (cat.type) {
-                    case 'performance_tiered_percentage':
-                        const renewalTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => percentageOfGoal >= t.threshold);
-                        const renewalMultiplier = renewalTier ? renewalTier.value : 0;
-                        performanceBonus = actual * renewalMultiplier;
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        break;
-                    case 'performance_tiered_amount':
-                        const salesTier = (catSettings.tiers || []).sort((a,b) => b.threshold - a.threshold).find(t => actual >= t.threshold);
-                        const salesMultiplier = salesTier ? salesTier.value : 0;
-                        performanceBonus = actual * salesMultiplier;
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        break;
-                    case 'performance_fixed_multiplier':
-                        const fixedMultiplier = catSettings.multiplier || 0;
-                        performanceBonus = actual * fixedMultiplier;
-                        break;
-                    case 'threshold_only':
-                        if (catSettings.targetThreshold && percentageOfGoal >= catSettings.targetThreshold) {
-                            targetBonus = catSettings.targetBonus || 0;
-                        }
-                        break;
-                    case 'threshold_percentage_bonus':
-                        const csPercentageTier = (catSettings.tiers || []).sort((a,b) => b.percentage_threshold - a.percentage_threshold).find(t => percentageOfGoal >= t.percentage_threshold);
-                        if (csPercentageTier) {
-                            performanceBonus = csPercentageTier.bonus;
-                        }
-                        break;
-                    case 'fixed_bonus_on_condition':
-                        if (actual >= (catSettings.conditionValue || 1)) {
-                            performanceBonus = catSettings.bonusAmount || 0;
-                        }
-                        break;
+                if (cat.type === 'performance_tiered_percentage') {
+                    const percentage = goalValue > 0 ? actualValue / goalValue : 0;
+                    const tiers = settings.tiers || [];
+                    const applicableTier = tiers
+                        .sort((a, b) => b.threshold - a.threshold)
+                        .find(tier => percentage >= tier.threshold);
+                    
+                    if (applicableTier) {
+                        const bonus = actualValue * applicableTier.value;
+                        csvData.push([repName, roleName, period, `בונוס ביצועים - ${cat.name}`, bonus]);
+                    }
                 }
-
-                totalPerformanceBonus += performanceBonus;
-                totalTargetBonus += targetBonus;
-
-                csvContent += `${cat.name},${goal},${actual},${(percentageOfGoal * 100).toFixed(1)}%,₪${performanceBonus.toLocaleString('he-IL')},₪${targetBonus.toLocaleString('he-IL')}\n`;
             });
 
-            // Summary
-            csvContent += `\nסיכום\n`;
-            csvContent += `סה"כ בונוס ביצועים,₪${totalPerformanceBonus.toLocaleString('he-IL')}\n`;
-            csvContent += `סה"כ בונוס יעדים,₪${totalTargetBonus.toLocaleString('he-IL')}\n`;
-            csvContent += `סה"כ בונוס כולל,₪${(totalPerformanceBonus + totalTargetBonus).toLocaleString('he-IL')}\n`;
-
-            // Create and download file
+            const csvContent = csvData.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `bonus_report_${repName}_${period}.csv`;
+            link.click();
             
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', `דוח_בונוס_${repName.replace(/\s+/g, '_')}_${month}_${year}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showStatusMessage(`קובץ CSV יוצא בהצלחה עבור ${repName}!`, true);
-            } else {
-                showStatusMessage("הדפדפן אינו תומך בהורדת קבצים.", false);
-            }
-        }
-
-        // --- EVENT HANDLERS ---
-        function handleResetForm() {
-            const confirmed = window.prompt(`לאישור איפוס הטופס, הקלד "אפס":`);
-            if (confirmed !== "אפס") {
-                showStatusMessage("איפוס בוטל.", true);
-                return;
-            }
-            repNameInput.value = 'נציג חדש';
-            const now = new Date();
-            periodMonthInput.value = now.getMonth() + 1;
-            periodYearInput.value = now.getFullYear();
-            currentCategoryDefinitions.forEach(cat => {
-                 if (cat.goalInput) document.getElementById(`${cat.id}Goal`).value = '';
-                 if (cat.actualInput) document.getElementById(`${cat.id}Actual`).value = '';
-            });
-            profilesDropdown.value = "";
-            calculateBonuses();
-            showStatusMessage("הטופס אופס.", true);
-        }
-
-        function attachDataInputListeners() {
-            document.querySelectorAll('.data-input, #repName, #periodMonth, #periodYear').forEach(el => {
-                el.removeEventListener('input', calculateBonuses);
-                el.addEventListener('input', calculateBonuses);
-            });
+            showStatusMessage('קובץ CSV יוצא בהצלחה!', true);
         }
 
         // --- INITIALIZATION ---
         function initializeApp() {
-            // Clear localStorage to ensure clean defaults (for debugging)
-            // Uncomment the next line if you want to reset settings
-            // localStorage.clear();
-            
             showStatusMessage("טוען אפליקציה...", true);
 
             // Setup event listeners
             roleSelector.addEventListener('change', handleRoleChange);
+            
+            // Debug: Add detailed logging for settings toggle
+            console.log("🔧 DEBUG: Setting up settings toggle");
+            console.log("toggleSettingsBtn:", toggleSettingsBtn);
+            console.log("settingsPanel:", settingsPanel);
+            
+            if (!toggleSettingsBtn) {
+                console.error("❌ toggleSettingsBtn element not found!");
+                showStatusMessage("שגיאה: כפתור הגדרות לא נמצא", false);
+                return;
+            }
+            
+            if (!settingsPanel) {
+                console.error("❌ settingsPanel element not found!");
+                showStatusMessage("שגיאה: פאנל הגדרות לא נמצא", false);
+                return;
+            }
+            
             toggleSettingsBtn.addEventListener('click', () => {
-                const isHidden = settingsPanel.style.display === 'none';
+                console.log("🔄 Toggle settings button clicked!");
+                
+                // Check if a role is selected first
+                if (!currentSelectedRoleId) {
+                    showStatusMessage('אנא בחר תפקיד תחילה כדי לצפות בהגדרות', false);
+                    return;
+                }
+                
+                console.log("Panel current display:", settingsPanel.style.display);
+                console.log("Panel computed display:", window.getComputedStyle(settingsPanel).display);
+                
+                const isHidden = settingsPanel.style.display === 'none' || settingsPanel.style.display === '';
+                console.log("Panel is hidden:", isHidden);
+                
                 settingsPanel.style.display = isHidden ? 'block' : 'none';
-                toggleSettingsBtn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות';
+                toggleSettingsBtn.textContent = isHidden ? 'הסתר הגדרות' : 'הצג הגדרות תפקיד';
+                
+                console.log("Panel new display:", settingsPanel.style.display);
+                console.log("Button new text:", toggleSettingsBtn.textContent);
+                
+                // Ensure the settings form is built for the current role
+                if (isHidden && currentCategoryDefinitions && currentCategoryDefinitions.length > 0) {
+                    buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
+                }
+                
+                // Force visibility check
+                setTimeout(() => {
+                    console.log("After timeout - Panel computed display:", window.getComputedStyle(settingsPanel).display);
+                    console.log("After timeout - Panel visibility:", window.getComputedStyle(settingsPanel).visibility);
+                    console.log("After timeout - Panel opacity:", window.getComputedStyle(settingsPanel).opacity);
+                }, 100);
             });
             
+            console.log("✅ Settings toggle event listener attached");
+            
+            saveRoleSettingsBtn.addEventListener('click', handleSaveRoleSettings);
             saveProfileBtn.addEventListener('click', handleSaveProfile);
             profilesDropdown.addEventListener('change', handleLoadProfile);
             deleteProfileBtn.addEventListener('click', handleDeleteProfile);
             resetFormBtn.addEventListener('click', handleResetForm);
             printBtn.addEventListener('click', handlePrint);
             exportCsvBtn.addEventListener('click', handleExportCsv);
+            
+            // Add debug button functionality
+            document.getElementById('debugBtn').addEventListener('click', () => {
+                console.log("🔧 DEBUG INFO:");
+                console.log("- currentSelectedRoleId:", currentSelectedRoleId);
+                console.log("- rolesData:", rolesData);
+                console.log("- roleSelector.value:", roleSelector.value);
+                console.log("- toggleSettingsBtn.disabled:", toggleSettingsBtn.disabled);
+                console.log("- Number of roles available:", Object.keys(rolesData).length);
+                
+                // Force enable the settings button for testing
+                if (Object.keys(rolesData).length > 0) {
+                    const firstRoleId = Object.keys(rolesData)[0];
+                    roleSelector.value = firstRoleId;
+                    handleRoleChange();
+                    showStatusMessage(`🔧 Debug: Forced selection of role "${rolesData[firstRoleId].name}"`, true);
+                }
+            });
             
             // Set initial values
             repNameInput.value = 'נציג לדוגמה';
@@ -764,9 +883,19 @@
 
             // Load data and start
             loadAllRoles();
+            
             showStatusMessage("אפליקציה נטענה בהצלחה!", true);
         }
+        
+        // --- PAGE LOAD ---
         document.addEventListener('DOMContentLoaded', initializeApp);
+        
+        // Additional fallback initialization
+        window.addEventListener('load', () => {
+            if (!currentSelectedRoleId) {
+                initializeApp();
+            }
+        });
     </script>
 </body>
 </html>
