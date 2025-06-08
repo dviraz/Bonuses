@@ -447,6 +447,13 @@
             attachSettingsEventListeners();
         }
 
+        function attachDataInputListeners() {
+            document.querySelectorAll('.data-input').forEach(input => {
+                input.addEventListener('change', calculateBonuses);
+                input.addEventListener('blur', calculateBonuses); // Also trigger on blur for immediate feedback
+            });
+        }
+
         // --- SETTINGS EVENT LISTENERS ---
         function attachSettingsEventListeners() {
             // Add tier buttons

@@ -42,7 +42,6 @@ function calculateCommissions() {
 }
 
 // Event listeners for user interactions
-document.getElementById('calculateBtn').addEventListener('click', calculateCommissions);
 
 // Function to save profile data
 async function saveProfile(profileData) {
