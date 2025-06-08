@@ -135,14 +135,14 @@
                     { id: 'testCategory', name: 'קטגוריית מבחן', type: 'performance_tiered_percentage', goalInput: true, actualInput: true }
                 ],
                 bonusSettings: {
-                    testCategory: { 
+                    testCategory: {
                         tiers: [
-                            { threshold: 0.86, value: 20 }, 
-                            { threshold: 0.81, value: 15 }, 
-                            { threshold: 0.75, value: 10 }
-                        ], 
-                        targetThreshold: 0.95, 
-                        targetBonus: 250 
+                            { threshold: 86, value: 20 },
+                            { threshold: 81, value: 15 },
+                            { threshold: 75, value: 10 }
+                        ],
+                        targetThreshold: 95,
+                        targetBonus: 250
                     }
                 }
             },
@@ -155,9 +155,9 @@
                     { id: 'ridersSales', name: 'מכירות ריידרים', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
                 ],
                 bonusSettings: {
-                    personalRenewals: { tiers: [{ threshold: 0.86, value: 20 }, { threshold: 0.81, value: 15 }, { threshold: 0.75, value: 10 }, { threshold: 0.01, value: 5 }], targetThreshold: 0.95, targetBonus: 250 },
-                    teamRenewals: { targetThreshold: 0.88, targetBonus: 250 },
-                    newSales: { tiers: [{ threshold: 0.81, value: 70 }, { threshold: 0.61, value: 50 }, { threshold: 0.31, value: 40 }, { threshold: 0.01, value: 20 }], targetThreshold: 1.25, targetBonus: 250 },
+                    personalRenewals: { tiers: [{ threshold: 86, value: 20 }, { threshold: 81, value: 15 }, { threshold: 75, value: 10 }, { threshold: 1, value: 5 }], targetThreshold: 95, targetBonus: 250 },
+                    teamRenewals: { targetThreshold: 88, targetBonus: 250 },
+                    newSales: { tiers: [{ threshold: 81, value: 70 }, { threshold: 61, value: 50 }, { threshold: 31, value: 40 }, { threshold: 1, value: 20 }], targetThreshold: 125, targetBonus: 250 },
                     ridersSales: { multiplier: 20 }
                 }
             },
@@ -170,9 +170,9 @@
                     { id: 'ridersSalesSr', name: 'מכירות ריידרים (בכיר)', type: 'performance_fixed_multiplier', goalInput: true, actualInput: true }
                 ],
                 bonusSettings: {
-                    personalRenewalsSr: { tiers: [{ threshold: 0.86, value: 25 }, { threshold: 0.81, value: 20 }, { threshold: 0.75, value: 15 }, { threshold: 0.00, value: 10 }], targetThreshold: 0.97, targetBonus: 300 },
-                    teamRenewalsSr: { targetThreshold: 0.90, targetBonus: 300 },
-                    newSalesSr: { tiers: [{ threshold: 0.81, value: 80 }, { threshold: 0.61, value: 60 }, { threshold: 0.31, value: 50 }, { threshold: 0.01, value: 25 }], targetThreshold: 1.30, targetBonus: 300 },
+                    personalRenewalsSr: { tiers: [{ threshold: 86, value: 25 }, { threshold: 81, value: 20 }, { threshold: 75, value: 15 }, { threshold: 0, value: 10 }], targetThreshold: 97, targetBonus: 300 },
+                    teamRenewalsSr: { targetThreshold: 90, targetBonus: 300 },
+                    newSalesSr: { tiers: [{ threshold: 81, value: 80 }, { threshold: 61, value: 60 }, { threshold: 31, value: 50 }, { threshold: 1, value: 25 }], targetThreshold: 130, targetBonus: 300 },
                     ridersSalesSr: { multiplier: 25 }
                 }
             },
@@ -184,8 +184,8 @@
                     { id: 'excellenceCs', name: 'בונוס הצטיינות', type: 'fixed_bonus_on_condition', goalInput: false, actualInput: true }
                 ],
                 bonusSettings: {
-                    personalGoalCs: { tiers: [{ percentage_threshold: 1.0, bonus: 500 }, { percentage_threshold: 0.9, bonus: 250 }], targetBonus: 0 },
-                    teamGoalCs: { tiers: [{ percentage_threshold: 1.0, bonus: 400 }, { percentage_threshold: 0.9, bonus: 200 }], targetBonus: 0 },
+                    personalGoalCs: { tiers: [{ percentage_threshold: 100, bonus: 500 }, { percentage_threshold: 90, bonus: 250 }], targetBonus: 0 },
+                    teamGoalCs: { tiers: [{ percentage_threshold: 100, bonus: 400 }, { percentage_threshold: 90, bonus: 200 }], targetBonus: 0 },
                     excellenceCs: { conditionValue: 1, bonusAmount: 300 }
                 }
             }
@@ -364,20 +364,20 @@
                 if (cat.type === 'performance_tiered_percentage' || cat.type === 'performance_tiered_amount') {
                     html += `<div class="mb-4">
                                 <label class="input-label">מדרגות בונוס:</label>
-                                <div class="text-xs text-gray-500 mb-2">סף (${cat.type === 'performance_tiered_percentage' ? 'אחוז' : 'כמות'}) | מכפיל</div>
+                                <div class="text-xs text-gray-500 mb-2">סף (${cat.type === 'performance_tiered_percentage' ? 'אחוז %' : 'כמות'}) | מכפיל</div>
                                 <div id="tiers-${cat.id}" class="space-y-2">`;
                     
                     (catSettings.tiers || []).forEach((tier, i) => {
                         html += `<div class="tier-row flex items-center gap-2">
-                                    <input type="number" step="0.01" class="input-field setting-input flex-1" 
-                                           data-setting-category="${cat.id}" data-setting-type="tier-threshold" 
-                                           data-tier-index="${i}" value="${tier.threshold}" 
-                                           placeholder="סף ${cat.type === 'performance_tiered_percentage' ? '(0.81 = 81%)' : '(מספר)'}">
-                                    <input type="number" class="input-field setting-input flex-1" 
-                                           data-setting-category="${cat.id}" data-setting-type="tier-value" 
-                                           data-tier-index="${i}" value="${tier.value}" 
+                                    <input type="number" step="1" class="input-field setting-input flex-1"
+                                           data-setting-category="${cat.id}" data-setting-type="tier-threshold"
+                                           data-tier-index="${i}" value="${tier.threshold}"
+                                           placeholder="סף ${cat.type === 'performance_tiered_percentage' ? '(81 = 81%)' : '(מספר)'}">
+                                    <input type="number" class="input-field setting-input flex-1"
+                                           data-setting-category="${cat.id}" data-setting-type="tier-value"
+                                           data-tier-index="${i}" value="${tier.value}"
                                            placeholder="מכפיל">
-                                    <button type="button" class="btn-remove-tier text-red-500 hover:text-red-700 px-2 py-1" 
+                                    <button type="button" class="btn-remove-tier text-red-500 hover:text-red-700 px-2 py-1"
                                             data-category="${cat.id}" data-tier-index="${i}">
                                         ✕
                                     </button>
@@ -394,10 +394,10 @@
                     if (catSettings.hasOwnProperty('targetThreshold')) {
                          html += `<div class="mb-4">
                                     <label class="input-label">סף בונוס יעד:</label>
-                                    <input type="number" step="0.01" class="input-field setting-input" 
-                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold" 
-                                           value="${catSettings.targetThreshold}" 
-                                           placeholder="${cat.type === 'performance_tiered_percentage' ? '0.95 = 95%' : 'כמות'}">
+                                    <input type="number" step="1" class="input-field setting-input"
+                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold"
+                                           value="${catSettings.targetThreshold}"
+                                           placeholder="${cat.type === 'performance_tiered_percentage' ? '95 = 95%' : 'כמות'}">
                                   </div>`;
                     }
 
@@ -422,10 +422,10 @@
                     if (catSettings.hasOwnProperty('targetThreshold')) {
                          html += `<div class="mb-4">
                                     <label class="input-label">סף לבונוס יעד:</label>
-                                    <input type="number" step="0.01" class="input-field setting-input" 
-                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold" 
-                                           value="${catSettings.targetThreshold}" 
-                                           placeholder="0.88 = 88%">
+                                    <input type="number" step="1" class="input-field setting-input"
+                                           data-setting-category="${cat.id}" data-setting-type="targetThreshold"
+                                           value="${catSettings.targetThreshold}"
+                                           placeholder="88 = 88%">
                                   </div>`;
                     }
                     if (catSettings.hasOwnProperty('targetBonus')) {
@@ -489,7 +489,7 @@
             }
 
             // Add new tier with default values
-            currentBonusSettings[categoryId].tiers.push({ threshold: 0.01, value: 1 });
+            currentBonusSettings[categoryId].tiers.push({ threshold: 1, value: 1 });
             
             // Rebuild the settings form
             buildSettingsForm(currentCategoryDefinitions, currentBonusSettings);
@@ -620,20 +620,21 @@
 
                 if (cat.type === 'performance_tiered_percentage') {
                     const percentage = goalValue > 0 ? actualValue / goalValue : 0;
+                    const percentageAsPercent = percentage * 100; // Convert to percentage for comparison
                     const tiers = settings.tiers || [];
                     
-                    // Find applicable tier
+                    // Find applicable tier (thresholds are now stored as percentages)
                     const applicableTier = tiers
                         .sort((a, b) => b.threshold - a.threshold)
-                        .find(tier => percentage >= tier.threshold);
+                        .find(tier => percentageAsPercent >= tier.threshold);
                     
                     if (applicableTier) {
                         performanceBonus = actualValue * applicableTier.value;
                         performanceText = `${cat.name}: ${formatCurrency(actualValue)} × ${applicableTier.value} (${formatPercentage(percentage)}) = ${formatCurrency(performanceBonus)}`;
                     }
 
-                    // Target bonus
-                    if (settings.targetThreshold && settings.targetBonus && percentage >= settings.targetThreshold) {
+                    // Target bonus (targetThreshold is now stored as percentage)
+                    if (settings.targetThreshold && settings.targetBonus && percentageAsPercent >= settings.targetThreshold) {
                         targetBonus = settings.targetBonus;
                         targetText = `${cat.name}: עמידה ביעד ✓ = ${formatCurrency(targetBonus)}`;
                     }
@@ -642,7 +643,8 @@
                     performanceText = `${cat.name}: ${formatCurrency(actualValue)} × ${settings.multiplier || 0} = ${formatCurrency(performanceBonus)}`;
                 } else if (cat.type === 'threshold_only') {
                     const percentage = goalValue > 0 ? actualValue / goalValue : 0;
-                    if (settings.targetThreshold && settings.targetBonus && percentage >= settings.targetThreshold) {
+                    const percentageAsPercent = percentage * 100; // Convert to percentage for comparison
+                    if (settings.targetThreshold && settings.targetBonus && percentageAsPercent >= settings.targetThreshold) {
                         targetBonus = settings.targetBonus;
                         targetText = `${cat.name}: עמידה ביעד ✓ = ${formatCurrency(targetBonus)}`;
                     }
@@ -774,10 +776,11 @@
                 
                 if (cat.type === 'performance_tiered_percentage') {
                     const percentage = goalValue > 0 ? actualValue / goalValue : 0;
+                    const percentageAsPercent = percentage * 100; // Convert to percentage for comparison
                     const tiers = settings.tiers || [];
                     const applicableTier = tiers
                         .sort((a, b) => b.threshold - a.threshold)
-                        .find(tier => percentage >= tier.threshold);
+                        .find(tier => percentageAsPercent >= tier.threshold);
                     
                     if (applicableTier) {
                         const bonus = actualValue * applicableTier.value;

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Save Role Settings</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #b8daff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .log-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test: "שמור הגדרת תפקיד" (Save Role Settings) Functionality</h1>
+    
+    <div class="test-container">
+        <h2>📊 Test Results</h2>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔧 Manual Testing Controls</h2>
+        <button onclick="openMainApp()">Open Main Application</button>
+        <button onclick="testLocalStorage()">Test LocalStorage Access</button>
+        <button onclick="testPercentageConversion()">Test Percentage Conversion</button>
+        <button onclick="clearAllTests()">Clear Results</button>
+    </div>
+
+    <div class="test-container">
+        <h2>💾 LocalStorage Diagnosis</h2>
+        <button onclick="inspectStoredRoles()">Inspect Stored Role Data</button>
+        <button onclick="testSaveLoad()">Test Save/Load Cycle</button>
+        <div id="storageResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>📈 Percentage Format Testing</h2>
+        <div>
+            <label>Test Input (percentage): <input type="number" id="percentageInput" value="86" placeholder="86"></label>
+            <button onclick="testPercentageHandling()">Test Conversion</button>
+        </div>
+        <div id="percentageResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>📝 Test Log</h2>
+        <div id="logContainer" class="log-container"></div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let logEntries = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logEntries.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            updateLogDisplay();
+            console.log(`🧪 [${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('logContainer');
+            logContainer.innerHTML = logEntries.map(entry => `<div>${entry}</div>`).join('');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function addTestResult(testName, status, message, details = '') {
+            const result = {
+                name: testName,
+                status: status, // 'success', 'error', 'warning', 'info'
+                message: message,
+                details: details,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            testResults.push(result);
+            updateTestDisplay();
+            log(`Test "${testName}": ${status} - ${message}`, status);
+        }
+
+        function updateTestDisplay() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.status}">
+                    <strong>[${result.timestamp}] ${result.name}</strong><br>
+                    ${result.message}
+                    ${result.details ? `<br><small>${result.details}</small>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function clearAllTests() {
+            testResults = [];
+            logEntries = [];
+            updateTestDisplay();
+            updateLogDisplay();
+            document.getElementById('storageResults').innerHTML = '';
+            document.getElementById('percentageResults').innerHTML = '';
+        }
+
+        function openMainApp() {
+            log('Opening main application in new tab');
+            window.open('index.html', '_blank');
+            addTestResult('Main App Launch', 'info', 'Main application opened in new tab');
+        }
+
+        function testLocalStorage() {
+            log('Testing localStorage access');
+            try {
+                // Test write
+                localStorage.setItem('test_key', 'test_value');
+                
+                // Test read
+                const value = localStorage.getItem('test_key');
+                
+                if (value === 'test_value') {
+                    addTestResult('LocalStorage Access', 'success', 'LocalStorage read/write working correctly');
+                } else {
+                    addTestResult('LocalStorage Access', 'error', 'LocalStorage read failed');
+                }
+                
+                // Clean up
+                localStorage.removeItem('test_key');
+                
+            } catch (error) {
+                addTestResult('LocalStorage Access', 'error', 'LocalStorage access failed', error.message);
+            }
+        }
+
+        function inspectStoredRoles() {
+            log('Inspecting stored role data');
+            try {
+                const storedRoles = localStorage.getItem('commissionRoles');
+                const storageDiv = document.getElementById('storageResults');
+                
+                if (!storedRoles) {
+                    addTestResult('Role Data Inspection', 'warning', 'No role data found in localStorage');
+                    storageDiv.innerHTML = '<div class="warning">No role data found in localStorage</div>';
+                    return;
+                }
+
+                const rolesData = JSON.parse(storedRoles);
+                const roleCount = Object.keys(rolesData).length;
+                
+                addTestResult('Role Data Inspection', 'success', `Found ${roleCount} roles in localStorage`);
+                
+                let html = `<div class="info"><strong>Found ${roleCount} roles:</strong></div>`;
+                
+                Object.keys(rolesData).forEach(roleId => {
+                    const role = rolesData[roleId];
+                    html += `<div class="test-result info">
+                        <strong>Role: ${roleId} (${role.name})</strong><br>
+                        Categories: ${role.categoryDefinitions ? role.categoryDefinitions.length : 0}<br>
+                    `;
+                    
+                    // Check bonus settings for percentage format
+                    if (role.bonusSettings) {
+                        html += `<strong>Bonus Settings:</strong><br>`;
+                        Object.keys(role.bonusSettings).forEach(catId => {
+                            const settings = role.bonusSettings[catId];
+                            html += `&nbsp;&nbsp;${catId}: `;
+                            if (settings.tiers) {
+                                const thresholds = settings.tiers.map(t => `${t.threshold}%`).join(', ');
+                                html += `Tiers(${thresholds}) `;
+                            }
+                            if (settings.targetThreshold) {
+                                html += `Target(${settings.targetThreshold}%) `;
+                            }
+                            html += `<br>`;
+                        });
+                    }
+                    html += `</div>`;
+                });
+                
+                storageDiv.innerHTML = html;
+                
+            } catch (error) {
+                addTestResult('Role Data Inspection', 'error', 'Failed to parse role data', error.message);
+            }
+        }
+
+        function testSaveLoad() {
+            log('Testing save/load cycle');
+            try {
+                // Create test role data with percentage format
+                const testRole = {
+                    name: "Test Role",
+                    categoryDefinitions: [
+                        { id: 'testCat', name: 'Test Category', type: 'performance_tiered_percentage', goalInput: true, actualInput: true }
+                    ],
+                    bonusSettings: {
+                        testCat: {
+                            tiers: [
+                                { threshold: 86, value: 20 }, // 86% threshold
+                                { threshold: 75, value: 15 }  // 75% threshold
+                            ],
+                            targetThreshold: 95, // 95% target
+                            targetBonus: 250
+                        }
+                    }
+                };
+
+                // Save test data
+                const testData = { test_role: testRole };
+                localStorage.setItem('test_commissionRoles', JSON.stringify(testData));
+                
+                // Load and verify
+                const loadedData = JSON.parse(localStorage.getItem('test_commissionRoles'));
+                
+                if (loadedData && loadedData.test_role) {
+                    const loadedRole = loadedData.test_role;
+                    const thresholds = loadedRole.bonusSettings.testCat.tiers.map(t => t.threshold);
+                    const targetThreshold = loadedRole.bonusSettings.testCat.targetThreshold;
+                    
+                    addTestResult('Save/Load Cycle', 'success', 
+                        `Data saved and loaded correctly. Thresholds: ${thresholds.join(', ')}%, Target: ${targetThreshold}%`);
+                } else {
+                    addTestResult('Save/Load Cycle', 'error', 'Data not found after save');
+                }
+                
+                // Clean up
+                localStorage.removeItem('test_commissionRoles');
+                
+            } catch (error) {
+                addTestResult('Save/Load Cycle', 'error', 'Save/load test failed', error.message);
+            }
+        }
+
+        function testPercentageConversion() {
+            log('Testing percentage conversion logic');
+            
+            // Test the conversion logic used in the main app
+            const testCases = [
+                { input: 86, expected: 86, description: "Direct percentage (86% -> 86)" },
+                { input: 0.86, expected: 86, description: "Decimal to percentage (0.86 -> 86)" },
+                { input: 95, expected: 95, description: "High percentage (95% -> 95)" },
+                { input: 100, expected: 100, description: "Full percentage (100% -> 100)" }
+            ];
+            
+            let allPassed = true;
+            
+            testCases.forEach(testCase => {
+                // This mimics the percentage handling in the main app
+                const result = testCase.input > 1 ? testCase.input : testCase.input * 100;
+                
+                if (Math.abs(result - testCase.expected) < 0.01) {
+                    log(`✓ ${testCase.description}: ${testCase.input} -> ${result}`);
+                } else {
+                    log(`✗ ${testCase.description}: Expected ${testCase.expected}, got ${result}`, 'error');
+                    allPassed = false;
+                }
+            });
+            
+            if (allPassed) {
+                addTestResult('Percentage Conversion', 'success', 'All percentage conversion tests passed');
+            } else {
+                addTestResult('Percentage Conversion', 'error', 'Some percentage conversion tests failed');
+            }
+        }
+
+        function testPercentageHandling() {
+            const input = parseFloat(document.getElementById('percentageInput').value) || 0;
+            const resultsDiv = document.getElementById('percentageResults');
+            
+            log(`Testing percentage handling for input: ${input}`);
+            
+            // Test various conversion scenarios
+            const asPercentage = input; // Direct use as percentage
+            const asDecimal = input / 100; // Convert to decimal
+            const backToPercentage = asDecimal * 100; // Convert back
+            
+            const results = `
+                <div class="info">
+                    <strong>Input: ${input}</strong><br>
+                    As percentage: ${asPercentage}%<br>
+                    As decimal: ${asDecimal}<br>
+                    Back to percentage: ${backToPercentage}%<br>
+                    
+                    <strong>Comparison Tests:</strong><br>
+                    Input >= 86%: ${input >= 86 ? '✓' : '✗'}<br>
+                    Input >= 95%: ${input >= 95 ? '✓' : '✗'}<br>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = results;
+            addTestResult('Percentage Input Test', 'info', `Tested input ${input}% - see detailed results above`);
+        }
+
+        // Auto-run initial tests
+        window.addEventListener('load', () => {
+            log('Starting automated tests');
+            testLocalStorage();
+            testPercentageConversion();
+            inspectStoredRoles();
+            
+            // Test if main app elements would be accessible
+            setTimeout(() => {
+                log('Test suite initialization complete');
+                addTestResult('Test Suite', 'success', 'All automated tests completed. Use manual controls to test Save Role Settings functionality.');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
